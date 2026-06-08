@@ -8,11 +8,15 @@
 # Exits 0 silently if no Python is found — hooks must never block the AI tool.
 set -u
 
-if command -v python3 >/dev/null 2>&1; then
+# Use execution test instead of command -v to skip Windows App Execution Aliases
+# (e.g. /WindowsApps/python3.exe) which are found on PATH but fail to run in bash.
+_py_works() { "$1" --version >/dev/null 2>&1; }
+
+if _py_works python3; then
   PY=python3
-elif command -v python >/dev/null 2>&1; then
+elif _py_works python; then
   PY=python
-elif command -v py >/dev/null 2>&1; then
+elif _py_works "py -3"; then
   PY="py -3"
 else
   # PATH lookup failed — probe standard Windows install locations.
