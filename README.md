@@ -98,3 +98,13 @@ The hook system needs **one** of: `python3`, `python`, or `py` on PATH.
 | macOS | `brew install python3` or use system Python 3 |
 
 The `scripts/_pyrun.*` wrappers detect whichever is available — students do not need to alias `python3` → `python`.
+
+---
+
+## Gate 1
+
+| Resource | Link |
+|---|---|
+| Project Brief | [Notion — Project Brief](https://www.notion.so/Project-Brief-378534a1531380ae93cad798fff87fdc?source=copy_link) |
+| PRD (EduVault) | [Notion — PRD_EduVault](https://www.notion.so/PRD_EduVault-378534a15313807b8e4fc30feaf83043?source=copy_link) |
+| Wireframe / UI Flow | [Google Drive](https://drive.google.com/file/d/1O-7x5yfBniNPIQPw9KyfbYuHF5C76d81/view?usp=sharing) |
