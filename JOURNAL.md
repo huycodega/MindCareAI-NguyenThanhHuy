@@ -117,3 +117,31 @@
 - Viáº¿t HITL (Human-in-the-Loop) flow cho clinician review.
 
 ---
+
+## Week 3 — 2026-06-15
+
+### Features shipped
+- Gmail self-registration + OTP verification (SHA-256 hash, Redis TTL, 5-attempt limit)
+- Multi-turn conversation threads (tasktab) with sidebar UI
+- Per-user durable memory (recurring themes, techniques used)
+- Risk-aware 3-store RAG retrieval (bge-m3 1024-dim, sigmoid reranker, gate threshold 0.65)
+- ReAct agent orchestrator (6 tools: retrieve, recall, analyze, generate, clarify, escalate)
+- Modal A100-80GB deployment for 3 services (cbt-llm, cbt-safety, cbt-agent)
+- All 3 services use Huysun29/cbt-qwen2.5-7b-v2 (best model from M4 eval)
+- Realtime AI log push to Phoenix dashboard
+
+### AI tools used
+- Claude Code: full system architecture, backend services, agent loop, Modal services
+- Hooks auto-log every interaction to phoenix.note.transformerlabs.ai
+
+### Hardest problem
+Risk-aware RAG router: matching eval pipeline exactly (AST diff confirmed 100% match).
+Qdrant version mismatch between data build env (1.12+) and backend (1.12.0) — fixed by upgrading to 1.18.0.
+
+### What I'd do differently
+Start with Mock_LLM=false earlier to catch Modal cold start issues sooner.
+
+### Plan for next 
+- Clinician copilot (SOAP auto-generation)
+- Fine-tune evaluation on real user sessions
+- Add Vietnamese language support
