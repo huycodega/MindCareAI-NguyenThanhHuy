@@ -118,43 +118,41 @@
 
 ---
 
----
-
-## Week 3 - Backend & AI Pipeline Integration
+## Week 3 - Xây dựng hệ thống, tích hợp AI pipeline vào backend
 
 ### Features shipped
 
-- Gmail self-registration + OTP verification (SHA-256 hash, Redis TTL, 5-attempt limit).
-- Multi-turn conversation threads (tasktab) with sidebar UI.
-- Per-user durable memory (recurring themes, techniques used).
-- Risk-aware 3-store RAG retrieval (bge-m3 1024-dim, sigmoid reranker, gate threshold 0.65).
-- ReAct agent orchestrator (6 tools: retrieve, recall, analyze, generate, clarify, escalate).
-- Modal A100-80GB deployment for 3 services (cbt-llm, cbt-safety, cbt-agent).
-- All 3 services use `Huysun29/cbt-qwen2.5-7b-v2` (best model from M4 eval).
-- Realtime AI log push to Phoenix dashboard.
+- Đăng ký tài khoản bằng Gmail + xác minh OTP (SHA-256 hash, Redis TTL, giới hạn 5 lần thử).
+- Quản lý nhiều luồng chat (tasktab) với sidebar UI.
+- Bộ nhớ người dùng lâu dài (recurring themes, techniques used).
+- RAG 3-store nhận thức rủi ro (bge-m3 1024-dim, sigmoid reranker, ngưỡng 0.65).
+- Agent orchestrator theo ReAct (6 tool: retrieve, recall, analyze, generate, clarify, escalate).
+- Deploy lên Modal A100-80GB cho 3 service (cbt-llm, cbt-safety, cbt-agent).
+- Cả 3 service dùng \Huysun29/cbt-qwen2.5-7b-v2\ (model tốt nhất từ eval M4).
+- Push AI log realtime lên Phoenix dashboard.
 
 ### AI tools used and how they helped
 
-- Claude Code: full system architecture, backend services, agent loop, Modal services, end-to-end testing.
-- Hooks auto-log every interaction to `phoenix.note.transformerlabs.ai` in real-time.
+- Claude Code: toàn bộ kiến trúc hệ thống, backend service, agent loop, Modal service, kiểm thử đầu cuối.
+- Hook tự động ghi log mỗi tương tác lên \phoenix.note.transformerlabs.ai\ theo thời gian thực.
 
 ### Hardest problem of the week
 
-- Risk-aware RAG router: matching eval pipeline exactly (AST diff confirmed 100% match).
-- Qdrant version mismatch between data build env (1.12+) and backend (1.12.0).
+- RAG router nhận thức rủi ro: đảm bảo khớp chính xác với eval pipeline (AST diff xác nhận 100% match).
+- Xung đột phiên bản Qdrant giữa môi trường build data (1.12+) và backend (1.12.0).
 
 ### How we solved it
 
-- Upgraded `qdrant-client` from 1.12.0 to 1.18.0 to handle `strict_mode_config`/`metadata` null fields.
-- Fixed `QDRANT_LOCAL_PATH` env var to point to correct local path instead of Docker container path.
+- Nâng cấp \qdrant-client\ từ 1.12.0 lên 1.18.0 để xử lý các trường null trong \strict_mode_config\/\metadata\.
+- Sửa biến \QDRANT_LOCAL_PATH\ trỏ đúng vào đường dẫn local thay vì đường dẫn Docker container.
 
 ### What we would do differently
 
-- Set `MOCK_LLM=false` earlier to catch Modal cold start issues sooner.
-- Copy `.env` to `backend/.env` from the start (pydantic-settings reads from CWD).
+- Đặt \MOCK_LLM=false\ sớm hơn để phát hiện vấn đề Modal cold start sớm hơn.
+- Sao chép \.env\ sang \ackend/.env\ ngay từ đầu (pydantic-settings đọc từ CWD).
 
 ### Plan for next week
 
-- Clinician copilot (SOAP auto-generation).
-- Fine-tune evaluation on real user sessions.
-- Add Vietnamese language support.
+- Clinician copilot (tự động sinh SOAP).
+- Đánh giá fine-tune trên session người dùng thực.
+- Bổ sung hỗ trợ tiếng Việt.
