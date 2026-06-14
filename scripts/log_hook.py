@@ -2,13 +2,22 @@
 """
 Shared AI hook logger — works with Claude Code, Gemini CLI, Codex, Cursor, Copilot.
 Reads JSON from stdin, normalizes to common format, appends to .ai-log/session.jsonl
+and pushes each entry to AI_LOG_SERVER in real-time (fire-and-forget, 4 s timeout).
 """
 import json
 import os
 import sys
 import subprocess
+import urllib.request
+import urllib.error
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 VN_TZ = timezone(timedelta(hours=7))
 
@@ -155,6 +164,23 @@ def normalize(data: dict, tool: str) -> dict | None:
     return base
 
 
+def _push_realtime(entry: dict) -> None:
+    """Fire-and-forget: POST one entry to AI_LOG_SERVER. Never raises."""
+    server = os.environ.get("AI_LOG_SERVER", "")
+    api_key = os.environ.get("AI_LOG_API_KEY", "")
+    if not server:
+        return
+    try:
+        payload = json.dumps({"entries": [entry]}, ensure_ascii=False).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+        req = urllib.request.Request(server, data=payload, headers=headers, method="POST")
+        urllib.request.urlopen(req, timeout=4).close()
+    except Exception:
+        pass  # server down → silent, logs are still safe on disk
+
+
 def main():
     # Read stdin as UTF-8 explicitly. On Windows, sys.stdin defaults to the
     # system code page (e.g. cp1252), which corrupts non-Latin1 prompts
@@ -179,6 +205,9 @@ def main():
 
     with open(log_file, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+    # Push to server immediately — realtime, no git push needed.
+    _push_realtime(entry)
 
     # Output valid JSON (required by some tools like Gemini)
     print(json.dumps({"status": "logged"}))
