@@ -22,6 +22,27 @@ except ImportError:
 VN_TZ = timezone(timedelta(hours=7))
 
 
+def _claude_model_from_settings() -> str:
+    """Read model from the nearest .claude/settings.json (auto-detects active model)."""
+    try:
+        cwd = Path.cwd()
+        for parent in [cwd, *cwd.parents]:
+            p = parent / ".claude" / "settings.json"
+            if p.exists():
+                data = json.loads(p.read_text(encoding="utf-8"))
+                m = data.get("model", "")
+                if m:
+                    return m
+        # Fall back to global settings
+        global_settings = Path.home() / ".claude" / "settings.json"
+        if global_settings.exists():
+            data = json.loads(global_settings.read_text(encoding="utf-8"))
+            return data.get("model", "")
+    except Exception:
+        pass
+    return ""
+
+
 def git(cmd):
     try:
         return subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.DEVNULL).strip()
@@ -84,8 +105,10 @@ def normalize(data: dict, tool: str) -> dict | None:
             data.get("conversation_id") or
             data.get("generation_id") or ""
         ),
-        "model": data.get("model", "") or next(
-            (a.split("=", 1)[1] for a in sys.argv[1:] if a.startswith("--model=")), ""
+        "model": (
+            data.get("model", "")
+            or next((a.split("=", 1)[1] for a in sys.argv[1:] if a.startswith("--model=")), "")
+            or _claude_model_from_settings()
         ),
         "repo": repo,
         "branch": git("git rev-parse --abbrev-ref HEAD"),
