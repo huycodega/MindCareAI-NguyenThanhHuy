@@ -76,25 +76,33 @@ services:
       MINIO_SECRET_KEY: cbt_minio_dev_pw
 
       # --- Qdrant local file mode (no container) ---
-      # Structure: models/cbt_rag_final/qdrant_storage/ (Qdrant DB)
-      #            models/cbt_rag_final/rag_outputs/    (BM25 pickles + JSONL)
-      QDRANT_LOCAL_PATH: /app/models/cbt_rag_final/qdrant_storage
-      BM25_RAG1_PATH: /app/models/cbt_rag_final/rag_outputs/bm25_rag1.pkl
-      BM25_RAG2_PATH: /app/models/cbt_rag_final/rag_outputs/bm25_rag2.pkl
+      # Mount: ./data new/qdrant_local → /app/data/qdrant_local
+      # Contains 3 collections built by rag-new.ipynb:
+      #   cbt_rag_bge_m3__cbt_knowledge_base
+      #   cbt_rag_bge_m3__response_template_base
+      #   cbt_rag_bge_m3__safety_policy_base
+      QDRANT_LOCAL_PATH: /app/data/qdrant_local
 
-      # --- models ---
-      # Primary CBT responder: cbt-llama-3.1-8b (Llama-3.1-8B + LoRA)
-      HF_MODEL_REPO: "Huysun29/cbt-llama-3.1-8b"
-      HF_BASE_MODEL: "meta-llama/Meta-Llama-3.1-8B-Instruct"
-      # Safety/crisis gate: cbt-qwen-7b (QWen2.5-7B + LoRA)
-      SAFETY_HF_MODEL_REPO: "Huysun29/cbt-qwen-7b"
+      # --- models (single model for all roles) ---
+      # cbt-qwen2.5-7b-v2: Qwen2.5-7B full-merged CBT fine-tune
+      HF_MODEL_REPO: "Huysun29/cbt-qwen2.5-7b-v2"
+      HF_BASE_MODEL: "Qwen/Qwen2.5-7B-Instruct"
+      LLM_IS_MERGED: "true"
+      SAFETY_HF_MODEL_REPO: "Huysun29/cbt-qwen2.5-7b-v2"
       SAFETY_HF_BASE_MODEL: "Qwen/Qwen2.5-7B-Instruct"
+      AGENT_MODEL_REPO: "Huysun29/cbt-qwen2.5-7b-v2"
 
-      MOCK_LLM: "${MOCK_LLM:-true}"                         # flip false when Modal ready
+      MOCK_LLM: "${MOCK_LLM:-false}"
       MODAL_LLM_ENDPOINT: "${MODAL_LLM_ENDPOINT:-}"
       MODAL_HEALTH_ENDPOINT: "${MODAL_HEALTH_ENDPOINT:-}"
       MODAL_SAFETY_ENDPOINT: "${MODAL_SAFETY_ENDPOINT:-}"
       MODAL_SAFETY_HEALTH_ENDPOINT: "${MODAL_SAFETY_HEALTH_ENDPOINT:-}"
+
+      # --- agent orchestrator ---
+      AGENT_ENABLED: "${AGENT_ENABLED:-false}"
+      MODAL_AGENT_ENDPOINT: "${MODAL_AGENT_ENDPOINT:-}"
+      MODAL_AGENT_HEALTH_ENDPOINT: "${MODAL_AGENT_HEALTH_ENDPOINT:-}"
+
       HF_TOKEN: "${HF_TOKEN:-}"
 
       # --- security ---
@@ -103,9 +111,9 @@ services:
     ports: ["8000:8000"]
     volumes:
       - ./backend:/app
-      # IMPORTANT: models/ is RW (not :ro) because Qdrant local mode
-      # writes WAL + session_memory upserts back to disk.
-      - ./models:/app/models
+      # RAG data built by rag-new.ipynb — Qdrant v2 collections (3-store BGE-M3)
+      # Path has a space: quote or use the compose path syntax below.
+      - "./data new:/app/data"
 
   prometheus:
     image: prom/prometheus:latest
