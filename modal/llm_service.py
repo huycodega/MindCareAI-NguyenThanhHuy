@@ -1,4 +1,4 @@
-"""
+﻿"""
 Modal LLM service — Huysun29/cbt-qwen2.5-7b-v2
 (Qwen2.5-7B-Instruct + CBT SFT, FULL MERGED model — best model @ M4 eval)
 

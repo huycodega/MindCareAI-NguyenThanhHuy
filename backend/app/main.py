@@ -1,4 +1,4 @@
-"""
+﻿"""
 FastAPI application entry.
 
 On startup:
@@ -98,8 +98,8 @@ def health():
     return {
         "api": "ok",
         "mock_llm": settings.mock_llm,
-        "primary_responder": settings.hf_model_repo,        # cbt-llama-3.1-8b
-        "safety_gate": settings.safety_hf_model_repo,       # cbt-qwen-7b
+        "primary_responder": settings.hf_model_repo,        # cbt-qwen2.5-7b-v2
+        "safety_gate": settings.safety_hf_model_repo,       # cbt-qwen2.5-7b-v2
         "qdrant_path": settings.qdrant_local_path,
         "llm": llm_client.health(),
         "safety": safety_gate.health(),

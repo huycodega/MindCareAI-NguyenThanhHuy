@@ -1,4 +1,4 @@
-"""
+﻿"""
 Agentic orchestration layer — the ReAct loop for the CBT assistant.
 
 WHERE THIS SITS
@@ -16,7 +16,7 @@ SAFETY INVARIANTS
   • The agent can only move safety UP, never down: `escalate_to_clinician`
     forces a clinician review even on L3. There is NO tool that lowers risk.
   • The actual client-facing reply is always produced by the fine-tuned
-    responder `cbt-llama-3.1-8b` via `generate_cbt_response` (which routes
+    responder `cbt-qwen2.5-7b-v2` via `generate_cbt_response` (which routes
     through llm_client + prompt_builder), so the orchestrator never writes
     therapeutic copy itself.
   • Any failure (orchestrator unreachable, malformed tool calls, step budget

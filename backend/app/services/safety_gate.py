@@ -1,5 +1,5 @@
-"""
-Safety triage gate — Huysun29/cbt-qwen-7b (QWen2.5-7B + LoRA).
+﻿"""
+Safety triage gate — Huysun29/cbt-qwen2.5-7b-v2 (Qwen2.5-7B fine-tuned v2).
 
 Two-tier architecture
 ─────────────────────
@@ -88,7 +88,7 @@ _SAFETY_SYSTEM_PROMPT = (
 
 
 def _call_modal(text: str, timeout: int = 600) -> Optional[Dict]:
-    """Call Modal-hosted cbt-qwen-7b safety endpoint. Returns None on failure."""
+    """Call Modal-hosted cbt-qwen2.5-7b-v2 safety endpoint. Returns None on failure."""
     url = settings.modal_safety_endpoint
     if not url:
         return None
@@ -121,7 +121,7 @@ def _call_modal(text: str, timeout: int = 600) -> Optional[Dict]:
                 "severity": raw.get("severity", _level_to_severity(level)),
                 "confidence": float(raw.get("confidence", 0.7)),
                 "reason": raw.get("reason", "QWen safety model"),
-                "source": "cbt-qwen-7b",
+                "source": "cbt-qwen2.5-7b-v2",
                 "latency_ms": round(latency * 1000),
             }
 
@@ -145,7 +145,7 @@ def assess(text: str) -> Dict:
 
     Priority logic (safety-first):
         1. Heuristic L0/L1 → ALWAYS use heuristic (never override crisis)
-        2. Modal cbt-qwen-7b → for L2/L3 nuanced assessment
+        2. Modal cbt-qwen2.5-7b-v2 → for L2/L3 nuanced assessment
         3. Heuristic fallback → when Modal unavailable
     """
     # Heuristic first — crisis keywords are hard overrides

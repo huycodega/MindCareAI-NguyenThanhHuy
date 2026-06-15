@@ -1,4 +1,4 @@
-# CBT Assistant v4
+﻿# CBT Assistant v4
 
 Hệ thống CBT clinician AI — kết hợp vai trò **trợ lý CBT** và **nhà trị liệu lâm sàng** trong một pipeline hoàn chỉnh.
 
@@ -17,8 +17,8 @@ Hệ thống CBT clinician AI — kết hợp vai trò **trợ lý CBT** và **n
 
 | Role | Model | Deploy |
 |------|-------|--------|
-| Primary CBT responder | `Huysun29/cbt-llama-3.1-8b` | Modal A10G |
-| Safety / crisis gate | `Huysun29/cbt-qwen-7b` | Modal T4 |
+| Primary CBT responder | `Huysun29/cbt-qwen2.5-7b-v2-v2` | Modal A10G |
+| Safety / crisis gate | `Huysun29/cbt-qwen2.5-7b-v2` | Modal T4 |
 | Embedder | `BAAI/bge-m3` | Local CPU |
 | Reranker | `BAAI/bge-reranker-v2-m3` | Local CPU |
 
@@ -28,7 +28,7 @@ Hệ thống CBT clinician AI — kết hợp vai trò **trợ lý CBT** và **n
 Client message
       │
       ▼
-[Safety Gate — cbt-qwen-7b]  →  L0/L1: crisis resources / clinician queue
+[Safety Gate — cbt-qwen2.5-7b-v2]  →  L0/L1: crisis resources / clinician queue
       │
    L2/L3
       │
@@ -39,7 +39,7 @@ Client message
 [Prompt Builder]  intake 6 sections + session ctx + analysis + retrieved
       │
       ▼
-[Primary LLM — cbt-llama-3.1-8b]  →  3 drafts (Technique/Rationale/Plan/Response)
+[Primary LLM — cbt-qwen2.5-7b-v2]  →  3 drafts (Technique/Rationale/Plan/Response)
       │
       ▼
 [Post-process]  parse + hallucination check + pre-flight
@@ -233,9 +233,9 @@ cbt_v4/
 │   │   ├── core/             config, auth, crypto, audit
 │   │   ├── db/               models, session, migrations
 │   │   ├── services/
-│   │   │   ├── safety_gate.py     ← cbt-qwen-7b (Modal) + heuristic fallback
+│   │   │   ├── safety_gate.py     ← cbt-qwen2.5-7b-v2 (Modal) + heuristic fallback
 │   │   │   ├── retrieval.py       ← BM25 + dense + RRF + rerank
-│   │   │   ├── llm_client.py      ← cbt-llama-3.1-8b (Modal) + mock
+│   │   │   ├── llm_client.py      ← cbt-qwen2.5-7b-v2 (Modal) + mock
 │   │   │   ├── prompt_builder.py  ← CBT clinician system prompt
 │   │   │   └── ...
 │   └── requirements.txt

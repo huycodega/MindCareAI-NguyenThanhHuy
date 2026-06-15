@@ -1,5 +1,5 @@
-"""
-Modal Safety Gate service — Huysun29/cbt-qwen-7b
+﻿"""
+Modal Safety Gate service — Huysun29/cbt-qwen2.5-7b-v2
 (QWen2.5-7B Instruct + CBT safety LoRA adapter)
 
 Role: safety/crisis gate — router and guard for the CBT pipeline.
@@ -49,10 +49,10 @@ image = (
 
 app = modal.App("cbt-safety")
 
-HF_REPO = os.environ.get("HF_SAFETY_MODEL_REPO", "Huysun29/cbt-qwen2.5-7b-v2")
+HF_REPO = os.environ.get("HF_SAFETY_MODEL_REPO", "Huysun29/cbt-qwen2.5-7b-v2-v2")
 HF_BASE = os.environ.get("HF_SAFETY_BASE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 # v2 ships as a FULL MERGED model → load HF_REPO directly. Set "false" to use
-# the legacy base + LoRA path (e.g. the old cbt-qwen-7b adapter).
+# the legacy base + LoRA path (e.g. the old cbt-qwen2.5-7b-v2 adapter).
 SAFETY_IS_MERGED = os.environ.get("SAFETY_IS_MERGED", "true").lower() != "false"
 
 hf_secret = modal.Secret.from_name("huggingface", required_keys=["HF_TOKEN"])

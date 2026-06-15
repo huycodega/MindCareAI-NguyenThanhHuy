@@ -1,11 +1,11 @@
-# Modal services — deployment
+﻿# Modal services — deployment
 
 Two services power the CBT pipeline in production:
 
 | Service | File | Model | Role |
 |---------|------|-------|------|
-| Primary LLM | `llm_service.py` | `Huysun29/cbt-llama-3.1-8b` | Primary CBT responder |
-| Safety Gate | `safety_service.py` | `Huysun29/cbt-qwen-7b` | Crisis / triage router |
+| Primary LLM | `llm_service.py` | `Huysun29/cbt-qwen2.5-7b-v2-v2` | Primary CBT responder |
+| Safety Gate | `safety_service.py` | `Huysun29/cbt-qwen2.5-7b-v2` | Crisis / triage router |
 
 ## 1. Install Modal CLI (one-time)
 
@@ -55,10 +55,10 @@ docker compose restart backend
 ```bash
 # Health checks
 curl $MODAL_HEALTH_ENDPOINT
-# → {"status":"ok","model":"Huysun29/cbt-llama-3.1-8b","role":"primary_responder"}
+# → {"status":"ok","model":"Huysun29/cbt-qwen2.5-7b-v2-v2","role":"primary_responder"}
 
 curl $MODAL_SAFETY_HEALTH_ENDPOINT
-# → {"status":"ok","model":"Huysun29/cbt-qwen-7b","role":"safety_crisis_gate"}
+# → {"status":"ok","model":"Huysun29/cbt-qwen2.5-7b-v2","role":"safety_crisis_gate"}
 
 # Test safety triage
 curl -X POST $MODAL_SAFETY_ENDPOINT \
@@ -76,8 +76,8 @@ curl -X POST $MODAL_LLM_ENDPOINT \
 
 | Service | GPU | Cost/hr | Cold start | Request latency |
 |---------|-----|---------|------------|-----------------|
-| LLM (`cbt-llama-3.1-8b`) | A10G | ~$1.10 | ~25-35 s | ~6-10 s (n=3) |
-| Safety gate (`cbt-qwen-7b`) | T4 | ~$0.35 | ~15-20 s | ~1-2 s |
+| LLM (`cbt-qwen2.5-7b-v2`) | A10G | ~$1.10 | ~25-35 s | ~6-10 s (n=3) |
+| Safety gate (`cbt-qwen2.5-7b-v2`) | T4 | ~$0.35 | ~15-20 s | ~1-2 s |
 
 `container_idle_timeout=300` (5 min) — both containers scale to zero
 between sessions so demo traffic costs cents.
@@ -88,11 +88,11 @@ between sessions so demo traffic costs cents.
 Client message
       │
       ▼
-[Safety Gate — cbt-qwen-7b]   ← fast, T4, classifies L0/L1/L2/L3
+[Safety Gate — cbt-qwen2.5-7b-v2]   ← fast, T4, classifies L0/L1/L2/L3
       │
   L0/L1 ──► No AI, crisis resources / clinician queue
       │
-  L2/L3 ──► [Primary LLM — cbt-llama-3.1-8b]  ← CBT response
+  L2/L3 ──► [Primary LLM — cbt-qwen2.5-7b-v2]  ← CBT response
                     │
                     ▼
               Hybrid RAG (cbt_rag_final, BM25 + dense + RRF)

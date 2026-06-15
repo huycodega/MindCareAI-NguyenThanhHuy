@@ -1,4 +1,4 @@
-"""
+﻿"""
 Prompt builder v4.
 
 Assembles the LLM input from:
@@ -12,8 +12,8 @@ Assembles the LLM input from:
 PII scrubber is applied to any free-text PHI before assembly. Final
 text is hashed (SHA-256) for audit trail (sessions.prompt_hash).
 
-Model: Huysun29/cbt-llama-3.1-8b (Llama-3.1-8B Instruct + CBT LoRA)
-Safety gate: Huysun29/cbt-qwen-7b (run prior to this builder)
+Model: Huysun29/cbt-qwen2.5-7b-v2 (Qwen2.5-7B full-merged CBT model)
+Safety gate: Huysun29/cbt-qwen2.5-7b-v2 (run prior to this builder)
 """
 import hashlib
 from typing import Dict, List, Optional

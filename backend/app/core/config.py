@@ -1,4 +1,4 @@
-"""
+﻿"""
 Centralized settings — read everything from environment variables so
 the same image works in Docker Compose, on Modal, and on a bare host.
 """
@@ -23,10 +23,10 @@ class Settings(BaseSettings):
     # cbt_rag_bge_m3__* collections; session_memory is created on first boot.
     qdrant_local_path: str = "/app/data/qdrant_local"
 
-    # ---- safety gate — Huysun29/cbt-qwen-7b (QWen2.5-7B + LoRA) ----
+    # ---- safety gate — Huysun29/cbt-qwen2.5-7b-v2 (QWen2.5-7B fine-tuned v2) ----
     # When MODAL_SAFETY_ENDPOINT is set, calls the Modal-hosted QWen model.
     # Falls back to local heuristic when endpoint is unset or unreachable.
-    safety_hf_model_repo: str = "Huysun29/cbt-qwen-7b"
+    safety_hf_model_repo: str = "Huysun29/cbt-qwen2.5-7b-v2"
     safety_hf_base_model: str = "Qwen/Qwen2.5-7B-Instruct"
     modal_safety_endpoint: Optional[str] = None
     modal_safety_health_endpoint: Optional[str] = None

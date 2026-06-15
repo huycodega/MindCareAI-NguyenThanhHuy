@@ -1,6 +1,6 @@
-"""
-LLM client — wraps the Modal endpoint for `Huysun29/cbt-llama-3.1-8b`
-(Llama-3.1-8B Instruct + CBT LoRA adapter). Guarded by the Redis circuit
+﻿"""
+LLM client — wraps the Modal endpoint for `Huysun29/cbt-qwen2.5-7b-v2`
+(Qwen2.5-7B full-merged CBT model). Guarded by the Redis circuit
 breaker so the API does not keep slamming a dead endpoint.
 
 When `MOCK_LLM=true` (default for the local thesis demo), returns
