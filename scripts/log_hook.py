@@ -84,7 +84,9 @@ def normalize(data: dict, tool: str) -> dict | None:
             data.get("conversation_id") or
             data.get("generation_id") or ""
         ),
-        "model": data.get("model", ""),
+        "model": data.get("model", "") or next(
+            (a.split("=", 1)[1] for a in sys.argv[1:] if a.startswith("--model=")), ""
+        ),
         "repo": repo,
         "branch": git("git rev-parse --abbrev-ref HEAD"),
         "commit": git("git rev-parse --short HEAD"),
