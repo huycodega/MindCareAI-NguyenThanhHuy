@@ -215,7 +215,7 @@ def chat(body: ChatIn, request: Request,
 
     # ════════════════════════════════════════════════════════════════════
     # AGENTIC PATH (feature-flagged). When the orchestrator is enabled AND
-    # reachable, the Llama-3.1 brain runs a ReAct loop: it decides how much
+    # reachable, the cbt-qwen2.5-7b-v2 brain runs a ReAct loop: it decides how much
     # to retrieve / analyze / recall, then takes ONE terminal action
     # (generate / ask_clarification / escalate). On ANY failure run_agent
     # returns None and we fall back to the deterministic pipeline below.

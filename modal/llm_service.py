@@ -21,7 +21,7 @@ Notes
 -----
 - v2 is a FULL MERGED model: loaded directly via AutoModelForCausalLM
   (LLM_IS_MERGED=true). Set LLM_IS_MERGED=false + HF_MODEL_REPO=<adapter>
-  to fall back to base + LoRA (the old Llama path).
+  to fall back to base + LoRA (the old adapter path).
 - Qwen2.5 uses a native system role — no message merging needed.
 - flash_attention_2 enabled when available for ~2× throughput.
 - HF_TOKEN: Qwen2.5 base is ungated, but the token lets private repos load.
@@ -128,7 +128,7 @@ class CBTLLMService:
         import torch
         t0 = time.time()
 
-        # Llama 3.1 natively supports the system role — pass messages directly
+        # Qwen2.5 natively supports the system role — pass messages directly
         prompt = self.tokenizer.apply_chat_template(
             messages, tokenize=False, add_generation_prompt=True)
 

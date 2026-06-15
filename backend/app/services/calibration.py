@@ -1,7 +1,7 @@
 ﻿"""
 Post-hoc temperature scaling (Guo et al., ICML 2017).
 
-The fine-tune `Huysun29/cbt-qwen2.5-7b-v2-v2` may ship a
+The fine-tune `Huysun29/cbt-qwen2.5-7b-v2` may ship a
 `temperature_calibration.json` fitted on a held-out set. T scaling brings
 ECE into a usable range without changing the argmax / accuracy.
 

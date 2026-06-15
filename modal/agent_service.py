@@ -74,14 +74,14 @@ model_cache = modal.Volume.from_name("cbt-model-cache", create_if_missing=True)
 # ─────────────────────────────────────────────────────────────────────────────
 def _parse_tool_calls(raw: str):
     """
-    Extract tool calls from Llama-3.1 output.
+    Extract tool calls from cbt-qwen2.5-7b-v2 output.
 
     Returns (content, tool_calls) where tool_calls is a list of
     {"name": str, "arguments": dict}. When no tool call is found, content
     carries the prose and tool_calls is empty.
     """
     text = raw.strip()
-    # Strip Llama's python tag if present
+    # Strip python tag if present (Qwen2.5 may emit <|python_tag|>)
     text = text.replace("<|python_tag|>", "").strip()
 
     calls = []

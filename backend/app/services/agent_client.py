@@ -1,6 +1,6 @@
 """
-Agent orchestrator client — wraps the Modal-hosted Llama-3.1-8B-Instruct
-base model (function-calling brain) at MODAL_AGENT_ENDPOINT.
+Agent orchestrator client — wraps the Modal-hosted Huysun29/cbt-qwen2.5-7b-v2
+(function-calling brain) at MODAL_AGENT_ENDPOINT.
 
 This is the transport layer for the agentic loop in `agent.py`. It speaks
 the same circuit-breaker protocol as `llm_client.py` so a dead orchestrator

@@ -6,7 +6,7 @@ WHERE THIS SITS
 The deterministic safety gate in `chat.py` runs FIRST and is authoritative:
   L0 (crisis) and L1 (high risk) never reach this module.
 This agent only ever runs in the L2/L3 zone. Its job is to let the
-Llama-3.1-8B-Instruct orchestrator ("brain") DECIDE how to handle a
+cbt-qwen2.5-7b-v2 orchestrator ("brain") DECIDE how to handle a
 moderate/routine message — how much to retrieve, whether to recall the
 user's history, whether to ask a clarifying question, or whether to escalate
 to a clinician — instead of a fixed Python pipeline.
@@ -50,7 +50,7 @@ _TERMINAL = {"generate_cbt_response", "ask_clarification",
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Tool schemas advertised to the orchestrator (OpenAI/Llama function format)
+# Tool schemas advertised to the orchestrator (OpenAI function-calling format)
 # ─────────────────────────────────────────────────────────────────────────────
 TOOL_SCHEMAS: List[Dict] = [
     {

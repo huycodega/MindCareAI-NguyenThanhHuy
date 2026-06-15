@@ -4,7 +4,7 @@ Two services power the CBT pipeline in production:
 
 | Service | File | Model | Role |
 |---------|------|-------|------|
-| Primary LLM | `llm_service.py` | `Huysun29/cbt-qwen2.5-7b-v2-v2` | Primary CBT responder |
+| Primary LLM | `llm_service.py` | `Huysun29/cbt-qwen2.5-7b-v2` | Primary CBT responder |
 | Safety Gate | `safety_service.py` | `Huysun29/cbt-qwen2.5-7b-v2` | Crisis / triage router |
 
 ## 1. Install Modal CLI (one-time)
@@ -16,8 +16,7 @@ modal token new     # opens browser to link your Modal account
 
 ## 2. HuggingFace token secret
 
-Both base models (`meta-llama/Meta-Llama-3.1-8B-Instruct` and
-`Qwen/Qwen2.5-7B-Instruct`) require accepting their licenses on HF first.
+The model `Huysun29/cbt-qwen2.5-7b-v2` is hosted on HuggingFace. Make sure your HF_TOKEN has read access.
 
 ```bash
 modal secret create hf-secret HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxx
@@ -35,11 +34,11 @@ Each deploy prints two HTTPS URLs. Add all four to your `.env`:
 ```
 MOCK_LLM=false
 
-# Primary CBT LLM — Llama-3.1-8B + LoRA
+# Primary CBT LLM — cbt-qwen2.5-7b-v2
 MODAL_LLM_ENDPOINT=https://<workspace>--cbt-llm-generate.modal.run
 MODAL_HEALTH_ENDPOINT=https://<workspace>--cbt-llm-health.modal.run
 
-# Safety gate — QWen-7B + LoRA
+# Safety gate — cbt-qwen2.5-7b-v2
 MODAL_SAFETY_ENDPOINT=https://<workspace>--cbt-safety-assess.modal.run
 MODAL_SAFETY_HEALTH_ENDPOINT=https://<workspace>--cbt-safety-health.modal.run
 ```
@@ -55,7 +54,7 @@ docker compose restart backend
 ```bash
 # Health checks
 curl $MODAL_HEALTH_ENDPOINT
-# → {"status":"ok","model":"Huysun29/cbt-qwen2.5-7b-v2-v2","role":"primary_responder"}
+# → {"status":"ok","model":"Huysun29/cbt-qwen2.5-7b-v2","role":"primary_responder"}
 
 curl $MODAL_SAFETY_HEALTH_ENDPOINT
 # → {"status":"ok","model":"Huysun29/cbt-qwen2.5-7b-v2","role":"safety_crisis_gate"}

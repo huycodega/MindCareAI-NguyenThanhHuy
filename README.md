@@ -17,7 +17,7 @@ Hệ thống CBT clinician AI — kết hợp vai trò **trợ lý CBT** và **n
 
 | Role | Model | Deploy |
 |------|-------|--------|
-| Primary CBT responder | `Huysun29/cbt-qwen2.5-7b-v2-v2` | Modal A10G |
+| Primary CBT responder | `Huysun29/cbt-qwen2.5-7b-v2` | Modal A10G |
 | Safety / crisis gate | `Huysun29/cbt-qwen2.5-7b-v2` | Modal T4 |
 | Embedder | `BAAI/bge-m3` | Local CPU |
 | Reranker | `BAAI/bge-reranker-v2-m3` | Local CPU |
@@ -162,10 +162,10 @@ pip install modal
 modal token new
 modal secret create hf-secret HF_TOKEN=hf_xxxxxxxxxx
 
-# Deploy primary CBT LLM (Llama-3.1-8B + LoRA)
+# Deploy primary CBT LLM (cbt-qwen2.5-7b-v2)
 modal deploy modal/llm_service.py
 
-# Deploy safety gate (QWen-7B + LoRA)
+# Deploy safety gate (cbt-qwen2.5-7b-v2)
 modal deploy modal/safety_service.py
 ```
 
@@ -240,8 +240,8 @@ cbt_v4/
 │   │   │   └── ...
 │   └── requirements.txt
 ├── modal/
-│   ├── llm_service.py        Llama-3.1-8B + LoRA (A10G)
-│   ├── safety_service.py     QWen-7B + LoRA (T4)
+│   ├── llm_service.py        cbt-qwen2.5-7b-v2 (A10G)
+│   ├── safety_service.py     cbt-qwen2.5-7b-v2 (T4)
 │   └── README.md
 ├── user_app/                 Vite + React — Patient UI
 ├── admin_app/                Vite + React — Clinician dashboard

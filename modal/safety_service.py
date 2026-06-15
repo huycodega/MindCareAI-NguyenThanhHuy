@@ -49,7 +49,7 @@ image = (
 
 app = modal.App("cbt-safety")
 
-HF_REPO = os.environ.get("HF_SAFETY_MODEL_REPO", "Huysun29/cbt-qwen2.5-7b-v2-v2")
+HF_REPO = os.environ.get("HF_SAFETY_MODEL_REPO", "Huysun29/cbt-qwen2.5-7b-v2")
 HF_BASE = os.environ.get("HF_SAFETY_BASE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
 # v2 ships as a FULL MERGED model → load HF_REPO directly. Set "false" to use
 # the legacy base + LoRA path (e.g. the old cbt-qwen2.5-7b-v2 adapter).

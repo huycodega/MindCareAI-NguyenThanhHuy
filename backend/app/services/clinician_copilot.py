@@ -6,7 +6,7 @@ All functions are best-effort: when the orchestrator (Modal) is unavailable
 they return a short "copilot unavailable" string so the review UI degrades
 gracefully instead of erroring.
 
-Backed by the same Llama-3.1-8B-Instruct orchestrator as the agent loop
+Backed by the same cbt-qwen2.5-7b-v2 orchestrator as the agent loop
 (via agent_client.complete) — no extra model, no fine-tune.
 
 Actions exposed through /api/admin/copilot/{sid}:
