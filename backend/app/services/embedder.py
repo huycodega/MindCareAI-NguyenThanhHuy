@@ -55,14 +55,32 @@ def embed_one(text: str) -> List[float]:
     return embed([text])[0]
 
 
+def _sigmoid(x: float) -> float:
+    import math
+    # clamp to avoid overflow on large-magnitude logits
+    if x >= 0:
+        return 1.0 / (1.0 + math.exp(-x))
+    e = math.exp(x)
+    return e / (1.0 + e)
+
+
 def rerank(query: str, candidates: List[str],
-           top_k: Optional[int] = None) -> List[Tuple[int, float]]:
-    """Returns [(original_index, score), ...] sorted descending by score."""
+           top_k: Optional[int] = None,
+           apply_sigmoid: bool = True) -> List[Tuple[int, float]]:
+    """Returns [(original_index, score), ...] sorted descending by score.
+
+    bge-reranker-v2-m3 outputs a raw relevance logit; with apply_sigmoid
+    (default) we map it to a 0–1 probability so scores are comparable to the
+    M3/M4 eval gate (rag_min_score=0.65)."""
     if not candidates:
         return []
     pairs = [(query, c) for c in candidates]
     scores = get_reranker().predict(pairs)
-    ranked = sorted(enumerate(scores), key=lambda x: -x[1])
+    out = []
+    for i, s in enumerate(scores):
+        v = _sigmoid(float(s)) if apply_sigmoid else float(s)
+        out.append((i, v))
+    ranked = sorted(out, key=lambda x: -x[1])
     if top_k:
         ranked = ranked[:top_k]
-    return [(i, float(s)) for i, s in ranked]
+    return ranked

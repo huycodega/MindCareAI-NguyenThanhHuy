@@ -46,7 +46,7 @@ SYSTEM_PROMPT = (
     "— avoid jargon, speak directly to their experience>\n\n"
 
     "Clinical guidelines:\n"
-    "  • Ground every response in the retrieved CBT knowledge and case examples\n"
+    "  • Use retrieved CBT knowledge as background — ALWAYS respond to what the client actually said in [CURRENT CLIENT MESSAGE], never to retrieved examples\n"
     "  • Match technique to the client's distortion type and severity level\n"
     "  • For L2 severity (moderate): prioritise validation before challenging\n"
     "  • If any crisis signals appear: set Technique to CRISIS_REFERRAL and "
@@ -76,7 +76,11 @@ def _format_intake(intake: Optional[Dict]) -> str:
 def _format_retrieved(items: List[Dict]) -> str:
     if not items:
         return ""
-    lines = ["[RETRIEVED CONTEXT — CBT knowledge + prior dialogues]"]
+    lines = [
+        "[REFERENCE MATERIAL — CBT knowledge base, NOT the client's words]",
+        "NOTE: Use the passages below as background clinical knowledge only.",
+        "Do NOT treat them as descriptions of this client's situation.",
+    ]
     for i, it in enumerate(items, 1):
         src = it.get("source_collection", "?")
         text = it.get("text", "")[:600]
@@ -96,15 +100,49 @@ def _format_analysis(analysis: Optional[Dict]) -> str:
     )
 
 
+def _format_memory(mem: Optional[Dict]) -> str:
+    """Durable per-user memory the assistant should carry across threads."""
+    if not mem:
+        return ""
+    themes = ", ".join(mem.get("recurring_themes", []) or []) or "—"
+    techs = ", ".join(mem.get("techniques_used", []) or []) or "—"
+    return (
+        "[USER MEMORY — what we know about this client across sessions]\n"
+        f"- Total prior turns: {mem.get('turn_count', 0)}\n"
+        f"- Recurring themes: {themes}\n"
+        f"- Techniques tried before: {techs}\n"
+        f"- Gist: {mem.get('summary', '—') or '—'}"
+    )
+
+
+def _format_history(history: Optional[List[Dict]]) -> str:
+    """The current conversation thread so the model has multi-turn context."""
+    if not history:
+        return ""
+    lines = ["[CONVERSATION SO FAR — this thread, oldest→newest]"]
+    for turn in history:
+        u = (turn.get("user") or "").strip()
+        a = (turn.get("reply") or "").strip()
+        if u:
+            lines.append(f"Client: {u}")
+        if a:
+            lines.append(f"Assistant: {a}")
+    return "\n".join(lines)
+
+
 def _format_session_ctx(ctx: Optional[Dict]) -> str:
     if not ctx:
         return ""
-    return (
+    base = (
         "[SESSION CONTEXT]\n"
         f"- Prior session count: {ctx.get('prior_count', 0)}\n"
         f"- Last technique used: {ctx.get('last_technique', '—')}\n"
         f"- Recent summary: {ctx.get('summary', '—')}"
     )
+    parts = [base,
+             _format_memory(ctx.get("memory")),
+             _format_history(ctx.get("history"))]
+    return "\n\n".join(p for p in parts if p)
 
 
 def build_messages(user_input_scrubbed: str,

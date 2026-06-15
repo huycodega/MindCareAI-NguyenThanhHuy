@@ -34,19 +34,47 @@ async function req(path, { method = "GET", body } = {}) {
 }
 
 export const api = {
+  // ---- auth ----
   login: (username, password) =>
     req("/login", {
       method: "POST",
       body: { username, password, expected_role: EXPECTED_ROLE },
     }),
+  register: (email, password) =>
+    req("/register", { method: "POST", body: { email, password } }),
+  verifyOtp: (email, otp) =>
+    req("/verify-otp", { method: "POST", body: { email, otp } }),
+  resendOtp: (email) =>
+    req("/resend-otp", { method: "POST", body: { email } }),
   me: () => req("/me"),
   consent: () => req("/consent", { method: "POST", body: { accepted: true } }),
   submitIntake: (raw_text) =>
     req("/intake", { method: "POST", body: { raw_text } }),
   getIntake: () => req("/my/intake"),
   health: () => req("/health"),
+
+  // ---- chat (multi-turn; pass conversation_id to continue a thread) ----
   chat: (message, opts = {}) =>
     req("/chat", { method: "POST", body: { message, ...opts } }),
   mySessions: () => req("/my/sessions"),
   mySession: (sid) => req(`/my/session/${sid}`),
+
+  // ---- conversations (tasktab) ----
+  listConversations: () => req("/conversations"),
+  createConversation: () => req("/conversations", { method: "POST" }),
+  getConversation: (cid) => req(`/conversations/${cid}`),
+  renameConversation: (cid, title) =>
+    req(`/conversations/${cid}`, { method: "PATCH", body: { title } }),
+  deleteConversation: (cid) =>
+    req(`/conversations/${cid}`, { method: "DELETE" }),
+
+  // ---- memory ----
+  myMemory: () => req("/memory"),
+
+  // ---- screening ----
+  submitScreening: (data) =>
+    req("/screening", { method: "POST", body: data }),
+  screeningHistory: (limit = 20) =>
+    req(`/screening/history?limit=${limit}`),
+  latestScreening: () => req("/screening/latest"),
 };

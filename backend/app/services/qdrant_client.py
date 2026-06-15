@@ -5,20 +5,22 @@ Reads/writes the directory at settings.qdrant_local_path
 (default `/app/models/cbt_rag_final` inside the container, mounted
 from `./models/cbt_rag_final` on the host).
 
-The actual Qdrant DB lives at models/cbt_rag_final/qdrant_storage/.
-Full layout (from the notebook zip extraction):
-  models/cbt_rag_final/qdrant_storage/.lock + meta.json
-  models/cbt_rag_final/qdrant_storage/collection/{cbt_knowledge,cbt_examples}/
-  models/cbt_rag_final/rag_outputs/bm25_rag1.pkl   ← BM25 for retrieval.py
-  models/cbt_rag_final/rag_outputs/bm25_rag2.pkl   ← BM25 for retrieval.py
+The Qdrant DB lives at settings.qdrant_local_path (mount `data new/qdrant_local`).
+Layout (built in rag-new.ipynb):
+  qdrant_local/.lock + meta.json
+  qdrant_local/collection/cbt_rag_bge_m3__cbt_knowledge_base/
+  qdrant_local/collection/cbt_rag_bge_m3__response_template_base/
+  qdrant_local/collection/cbt_rag_bge_m3__safety_policy_base/
 
-Three collections (per pipeline v4 retrieval layer):
-  cbt_knowledge   — 2,824 pts (intents.json + CounselChat Q&A)
-  cbt_examples    — 19,537 pts (MentalChat16K + Amod dialogues)
-  session_memory  — per-user prior sessions — created on first boot
+Stores (per the v2 risk-aware retriever):
+  cbt_rag_bge_m3__cbt_knowledge_base      — CBT concepts / techniques / psychoeducation
+  cbt_rag_bge_m3__response_template_base  — response structures / communication templates
+  cbt_rag_bge_m3__safety_policy_base      — crisis / safety / boundary policy
+  session_memory                          — per-user prior sessions — created on first boot
 
-`ensure_collections()` NEVER overwrites an existing collection. It only
-creates `session_memory` if missing, with bge-m3 dim (1024) cosine.
+`ensure_collections()` NEVER overwrites an existing collection. The three
+RAG stores ship pre-built; it only creates `session_memory` if missing
+(bge-m3 dim 1024, cosine).
 
 LIMITATION: local mode is single-writer (file lock). The backend is the
 only writer. The cron service must NOT touch Qdrant — it doesn't.
@@ -61,19 +63,30 @@ def ensure_collections() -> None:
         cli = get_qdrant()
         existing = {c.name for c in cli.get_collections().collections}
 
-        wanted = {
-            settings.qdrant_collection_kb,
-            settings.qdrant_collection_dialogues,
-            settings.qdrant_collection_memory,
+        prefix = settings.rag_collection_prefix
+        rag_stores = {
+            f"{prefix}__cbt_knowledge_base",
+            f"{prefix}__response_template_base",
+            f"{prefix}__safety_policy_base",
         }
-        for name in wanted:
+        # RAG stores are pre-built — warn (don't create) if any are missing,
+        # so a misconfigured mount is loud rather than silently empty.
+        for name in rag_stores:
             if name in existing:
-                log.info("Qdrant collection present: %s (preserved)", name)
-                continue
+                log.info("Qdrant RAG store present: %s (preserved)", name)
+            else:
+                log.warning("Qdrant RAG store MISSING: %s — check that "
+                            "qdrant_local_path points at the v2 RAG data", name)
+
+        # Only the app-managed memory collection is auto-created.
+        mem = settings.qdrant_collection_memory
+        if mem in existing:
+            log.info("Qdrant collection present: %s (preserved)", mem)
+        else:
             log.info("Creating Qdrant collection %s (dim=%d, cosine)",
-                     name, settings.embedding_dim)
+                     mem, settings.embedding_dim)
             cli.create_collection(
-                collection_name=name,
+                collection_name=mem,
                 vectors_config=VectorParams(size=settings.embedding_dim,
                                               distance=Distance.COSINE),
             )

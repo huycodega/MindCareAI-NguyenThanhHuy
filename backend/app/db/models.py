@@ -39,6 +39,10 @@ class User(Base):
     id: Mapped[uuid.UUID] = _uuid_pk()
     username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     email: Mapped[Optional[str]] = mapped_column(String, unique=True)
+    # Gmail self-registration: account exists but cannot log in until the
+    # emailed OTP is confirmed. Seed/clinician accounts are created verified.
+    email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False,
+                                                 default=False)
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
     role: Mapped[str] = mapped_column(String, nullable=False, default="user")
     consent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
@@ -49,6 +53,50 @@ class User(Base):
         CheckConstraint("role IN ('user','clinician','admin')",
                         name="users_role_check"),
     )
+
+
+# ============================================================
+# conversations  (a "tasktab" thread grouping many chat turns)
+# ============================================================
+class Conversation(Base):
+    """A multi-turn chat thread. Each turn is a Session (which carries the
+    full safety/triage pipeline outcome), linked back via conversation_id.
+    The user's sidebar ("tasktab") lists these threads newest-first."""
+    __tablename__ = "conversations"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False,
+                                       default="New conversation")
+    created_at: Mapped[datetime] = _now()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
+    archived: Mapped[bool] = mapped_column(Boolean, nullable=False,
+                                           default=False)
+
+
+Index("idx_conversations_user", Conversation.user_id,
+      Conversation.updated_at.desc())
+
+
+# ============================================================
+# per-user memory  (durable facts the assistant should remember)
+# ============================================================
+class UserMemory(Base):
+    """One row per user. Accumulates compact, non-PHI-light facts the
+    assistant carries across conversations (recurring concerns, what
+    techniques helped, preferences). Updated best-effort after each turn.
+    `facts` is encrypted (may contain personal context)."""
+    __tablename__ = "user_memory"
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    facts_enc: Mapped[Optional[bytes]] = mapped_column(LargeBinary)
+    summary: Mapped[Optional[str]] = mapped_column(Text)   # short non-PHI gist
+    turn_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
 
 
 # ============================================================
@@ -91,6 +139,10 @@ class Session(Base):
     id: Mapped[uuid.UUID] = _uuid_pk()
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    # Multi-turn thread this exchange belongs to (nullable for legacy rows).
+    conversation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("conversations.id", ondelete="CASCADE"))
     intake_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("intake_forms.id"))
     created_at: Mapped[datetime] = _now()
@@ -129,6 +181,8 @@ class Session(Base):
 
 
 Index("idx_sessions_user_time", Session.user_id, Session.created_at.desc())
+Index("idx_sessions_conversation", Session.conversation_id,
+      Session.created_at.asc())
 Index("idx_sessions_pending", Session.status,
       postgresql_where=(Session.status == "pending_review"))
 Index("idx_sessions_triage", Session.triage_level, Session.created_at.desc())
@@ -242,3 +296,38 @@ class AuditTrail(Base):
 Index("idx_audit_time", AuditTrail.ts.desc())
 Index("idx_audit_actor", AuditTrail.actor_id, AuditTrail.ts.desc())
 Index("idx_audit_resource", AuditTrail.resource_type, AuditTrail.resource_id)
+
+
+# ============================================================
+# screening results  (periodic PHQ-9 / GAD-7 check-ins)
+# ============================================================
+class Screening(Base):
+    """Stores periodic mental health screening results per user.
+    Users can complete PHQ-9 / GAD-7 questionnaires multiple times
+    to track progress over time."""
+    __tablename__ = "screenings"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = _now()
+
+    # PHQ-9 (0-27): depression severity
+    phq9_score: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    phq9_answers: Mapped[Optional[list]] = mapped_column(JSONB)  # [0-3] x 9
+
+    # GAD-7 (0-21): anxiety severity
+    gad7_score: Mapped[Optional[int]] = mapped_column(SmallInteger)
+    gad7_answers: Mapped[Optional[list]] = mapped_column(JSONB)  # [0-3] x 7
+
+    # Subjective mood (1-10)
+    mood_score: Mapped[Optional[int]] = mapped_column(SmallInteger)
+
+    # Derived level: normal | mild | moderate | moderately_severe | severe
+    phq9_level: Mapped[Optional[str]] = mapped_column(String)
+    gad7_level: Mapped[Optional[str]] = mapped_column(String)
+
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+
+
+Index("idx_screenings_user", Screening.user_id, Screening.created_at.desc())

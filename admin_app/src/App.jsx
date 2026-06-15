@@ -7,14 +7,38 @@ function TopBar({ user, onLogout }) {
   return (
     <div className="topbar">
       <div className="brand">
-        CBT Clinician
-        <small>Admin app · human-in-the-loop</small>
+        <span className="brand-dot" />CBT Clinician
+        <small>Human-in-the-loop · clinical oversight</small>
       </div>
       {user && (
         <div className="who">
-          <b>{user.username}</b> ({user.role})
+          <b>{user.username}</b>
           <button onClick={onLogout}>Sign out</button>
         </div>
+      )}
+    </div>
+  );
+}
+
+function StatusBar({ health }) {
+  if (!health) return null;
+  const mock = health.mock_llm;
+  return (
+    <div className="status-bar">
+      <span className="status-pill">
+        <span className={`status-dot${mock ? " warn" : ""}`} />
+        {mock ? "Mock mode (no GPU)" : "Live — Modal GPU"}
+      </span>
+      <span className="status-pill">
+        🧠 {health.primary_responder || health.model_repo}
+      </span>
+      <span className="status-pill">
+        🛡 {health.safety_gate}
+      </span>
+      {health.calibration?.loaded && (
+        <span className="status-pill">
+          T={health.calibration.global_temperature?.toFixed(2)}
+        </span>
       )}
     </div>
   );
@@ -33,18 +57,7 @@ export default function App() {
   return (
     <>
       <TopBar user={user} onLogout={logout} />
-      {health && (
-        <div className="shell mono"
-              style={{ fontSize: 11, color: "var(--ink-soft)",
-                       paddingTop: 10 }}>
-          LLM: {health.llm?.mode}
-          {health.mock_llm ? " (mock — no GPU)" : ""} · model:{" "}
-          {health.model_repo}
-          {health.calibration?.loaded
-            ? ` · T=${(health.calibration.global_temperature || 1).toFixed(2)}`
-            : ""}
-        </div>
-      )}
+      {user && <StatusBar health={health} />}
       {user ? <Clinician /> : <Login onAuth={setUser} />}
     </>
   );

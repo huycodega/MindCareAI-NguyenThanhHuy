@@ -6,6 +6,7 @@ Persistent state always lives in Postgres.
 """
 import json
 import time
+import hashlib
 from typing import Optional
 
 import redis
@@ -131,6 +132,52 @@ def circuit_record_failure() -> None:
             r.set("circuit:modal:opened_at", time.time())
     except redis.RedisError:
         pass
+
+
+# ============================================================
+# OTP store (Gmail registration email verification)
+# ============================================================
+# Stored hashed (never the raw code) with a short TTL. A separate counter
+# tracks failed attempts so we can lock out brute force. A cooldown key
+# rate-limits resends.
+def _otp_hash(code: str) -> str:
+    return hashlib.sha256(code.encode("utf-8")).hexdigest()
+
+
+def otp_set(email: str, code: str) -> None:
+    r = get_redis()
+    e = email.lower()
+    r.setex(f"otp:code:{e}", settings.otp_ttl_seconds, _otp_hash(code))
+    r.delete(f"otp:tries:{e}")
+    r.setex(f"otp:cooldown:{e}", settings.otp_resend_cooldown_seconds, "1")
+
+
+def otp_can_resend(email: str) -> bool:
+    """False while still within the resend cooldown window."""
+    try:
+        return not get_redis().exists(f"otp:cooldown:{email.lower()}")
+    except redis.RedisError:
+        return True
+
+
+def otp_verify(email: str, code: str) -> tuple[bool, str]:
+    """Return (ok, reason). On success the code is consumed."""
+    r = get_redis()
+    e = email.lower()
+    stored = r.get(f"otp:code:{e}")
+    if not stored:
+        return False, "expired"
+    tries = r.incr(f"otp:tries:{e}")
+    if tries == 1:
+        r.expire(f"otp:tries:{e}", settings.otp_ttl_seconds)
+    if tries > settings.otp_max_attempts:
+        r.delete(f"otp:code:{e}")
+        return False, "too_many_attempts"
+    if _otp_hash(code) != stored:
+        return False, "mismatch"
+    r.delete(f"otp:code:{e}")
+    r.delete(f"otp:tries:{e}")
+    return True, "ok"
 
 
 # ============================================================

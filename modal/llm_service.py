@@ -1,6 +1,6 @@
 """
-Modal LLM service — Huysun29/cbt-llama-3.1-8b
-(Llama-3.1-8B Instruct + CBT LoRA adapter)
+Modal LLM service — Huysun29/cbt-qwen2.5-7b-v2
+(Qwen2.5-7B-Instruct + CBT SFT, FULL MERGED model — best model @ M4 eval)
 
 Endpoints used by backend/app/services/llm_client.py:
     POST /generate   { messages, n_responses, temperature, top_p,
@@ -19,10 +19,12 @@ After deploy, Modal prints two HTTPS URLs. Add them to your .env:
 
 Notes
 -----
-- Llama 3.1 uses a native system role — no message merging needed.
-- flash_attention_2 is available on A10G (ampere+); enabled via
-  attn_implementation="flash_attention_2" for ~2× throughput.
-- HF_TOKEN is required because Meta-Llama-3.1-8B-Instruct is gated.
+- v2 is a FULL MERGED model: loaded directly via AutoModelForCausalLM
+  (LLM_IS_MERGED=true). Set LLM_IS_MERGED=false + HF_MODEL_REPO=<adapter>
+  to fall back to base + LoRA (the old Llama path).
+- Qwen2.5 uses a native system role — no message merging needed.
+- flash_attention_2 enabled when available for ~2× throughput.
+- HF_TOKEN: Qwen2.5 base is ungated, but the token lets private repos load.
   Create a modal secret named "hf-secret" with key HF_TOKEN.
 """
 import os
@@ -34,7 +36,10 @@ import modal
 # Container image: CUDA + transformers + peft (LoRA merge)
 # ─────────────────────────────────────────────────────────────────────────────
 image = (
-    modal.Image.debian_slim(python_version="3.11")
+    modal.Image.from_registry(
+        "nvidia/cuda:12.1.0-devel-ubuntu22.04",
+        add_python="3.11",
+    )
     .pip_install(
         "torch==2.4.1",
         "transformers==4.45.2",
@@ -43,63 +48,78 @@ image = (
         "huggingface-hub==0.25.2",
         "fastapi==0.115.0",
         "pydantic==2.9.2",
-        "flash-attn==2.7.2.post1",  # A10G / H100 ampere+ only
+        "packaging",
     )
-    .run_commands("pip install flash-attn --no-build-isolation || true")
+    .run_commands(
+        "pip install wheel ninja && pip install flash-attn --no-build-isolation"
+    )
 )
 
 app = modal.App("cbt-llm")
 
-HF_REPO = os.environ.get("HF_MODEL_REPO", "Huysun29/cbt-llama-3.1-8b")
-HF_BASE = os.environ.get("HF_BASE_MODEL", "meta-llama/Meta-Llama-3.1-8B-Instruct")
+HF_REPO = os.environ.get("HF_MODEL_REPO", "Huysun29/cbt-qwen2.5-7b-v2")
+HF_BASE = os.environ.get("HF_BASE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+# v2 ships as a full merged model → load HF_REPO directly. Set to "false"
+# (string) to use the legacy base + LoRA adapter path.
+LLM_IS_MERGED = os.environ.get("LLM_IS_MERGED", "true").lower() != "false"
 
-hf_secret = modal.Secret.from_name("hf-secret", required_keys=["HF_TOKEN"])
+hf_secret = modal.Secret.from_name("huggingface", required_keys=["HF_TOKEN"])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Modal class: loads models once per cold-start, stays warm 5 min
 # ─────────────────────────────────────────────────────────────────────────────
+model_cache = modal.Volume.from_name("cbt-model-cache", create_if_missing=True)
+
 @app.cls(
-    gpu="A10G",                    # 24 GB VRAM — sufficient for 8B bf16 + LoRA
+    gpu="A100-80GB",
     image=image,
     secrets=[hf_secret],
-    container_idle_timeout=300,
+    scaledown_window=300,
     timeout=900,
+    volumes={"/root/.cache/huggingface": model_cache},
 )
 class CBTLLMService:
     @modal.enter()
     def load(self):
-        """Run once per cold start — download base + attach LoRA adapter."""
+        """Run once per cold start. Merged → load HF_REPO directly;
+        otherwise load HF_BASE + attach the LoRA adapter at HF_REPO."""
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
-        from peft import PeftModel
         from huggingface_hub import login
 
         login(os.environ["HF_TOKEN"])
 
-        print(f"Loading base model: {HF_BASE}")
-        self.tokenizer = AutoTokenizer.from_pretrained(HF_BASE)
+        tok_src = HF_REPO if LLM_IS_MERGED else HF_BASE
+        print(f"Loading tokenizer: {tok_src}")
+        self.tokenizer = AutoTokenizer.from_pretrained(tok_src)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        # Try flash-attn; fall back to sdpa (still fast on A10G)
+        weights_src = HF_REPO if LLM_IS_MERGED else HF_BASE
+        print(f"Loading model weights: {weights_src} (merged={LLM_IS_MERGED})")
+        model = None
         for attn_impl in ("flash_attention_2", "sdpa", "eager"):
             try:
-                base = AutoModelForCausalLM.from_pretrained(
-                    HF_BASE,
+                model = AutoModelForCausalLM.from_pretrained(
+                    weights_src,
                     torch_dtype=torch.bfloat16,
                     device_map="auto",
                     attn_implementation=attn_impl,
                 )
-                print(f"Base loaded with attn={attn_impl}")
+                print(f"Model loaded with attn={attn_impl}")
                 break
             except Exception as e:
                 print(f"attn={attn_impl} failed ({e}), trying next")
 
-        print(f"Attaching LoRA adapter: {HF_REPO}")
-        self.model = PeftModel.from_pretrained(base, HF_REPO)
+        if not LLM_IS_MERGED:
+            from peft import PeftModel
+            print(f"Attaching LoRA adapter: {HF_REPO}")
+            model = PeftModel.from_pretrained(model, HF_REPO)
+
+        self.model = model
         self.model.eval()
-        print("CBT Llama-3.1-8B ready.")
+        print(f"CBT responder ready: {HF_REPO}")
 
     @modal.method()
     def generate(self, messages: list, n_responses: int = 3,

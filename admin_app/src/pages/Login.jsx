@@ -24,58 +24,34 @@ export default function Login({ onAuth }) {
 
   return (
     <div className="login-wrap">
-      <div className="card login-card">
-        <div className="eyebrow">CBT — Chuyên gia</div>
-        <h1 className="title" style={{ fontSize: 32 }}>
-          Clinician Dashboard
-        </h1>
-        <p className="sub" style={{ marginBottom: 22 }}>
-          Hệ thống hỗ trợ quyết định lâm sàng. Xem hàng đợi các phiên cần
-          duyệt, đọc nháp do AI tạo, và phê duyệt / chỉnh sửa / từ chối
-          trước khi phản hồi tới người dùng.
+      <div className="login-card">
+        <div className="login-logo">👨‍⚕️</div>
+        <div className="login-title">Clinician Dashboard</div>
+        <p className="login-sub">
+          Review AI-generated CBT responses, approve or edit drafts,
+          and oversee patient safety flags — all in one place.
         </p>
 
         <form onSubmit={submit}>
-          <label>Tên đăng nhập</label>
-          <input
-            value={username}
-            onChange={(e) => setU(e.target.value)}
-            style={{ marginBottom: 14 }}
-          />
-          <label>Mật khẩu</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setP(e.target.value)}
-            style={{ marginBottom: 18 }}
-          />
-          {err && (
-            <div className="banner crisis" style={{ marginTop: 0 }}>
-              {err}
-            </div>
-          )}
-          <button
-            className="btn accent"
-            disabled={busy}
-            style={{ width: "100%" }}
-          >
-            {busy && <span className="spinner" />}
-            Đăng nhập
+          <div className="field">
+            <label>Username</label>
+            <input value={username} onChange={(e) => setU(e.target.value)} autoFocus />
+          </div>
+          <div className="field">
+            <label>Password</label>
+            <input type="password" value={password} onChange={(e) => setP(e.target.value)} />
+          </div>
+          {err && <div className="banner crisis">{err}</div>}
+          <button className="btn accent-login full" disabled={busy} style={{ marginTop: 4 }}>
+            {busy ? <span className="spinner" /> : null}
+            Sign in
           </button>
         </form>
 
         <div className="divider" />
-        <p className="mono" style={{ color: "var(--ink-soft)", fontSize: 11.5 }}>
-          DEMO CLINICIAN ACCOUNT<br />
-          clinician / clinic123
-        </p>
-        <p
-          className="mono"
-          style={{ color: "var(--ink-soft)", fontSize: 11, marginTop: 10 }}
-        >
-          App này CHỈ chấp nhận tài khoản chuyên gia. Người dùng thường
-          đăng nhập tại <b>http://localhost:5173</b>.
-        </p>
+        <div className="demo-hint">
+          Demo: <strong>clinician</strong> / <strong>clinic123</strong>
+        </div>
       </div>
     </div>
   );

@@ -18,13 +18,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.auth_intake import router as auth_router
 from app.api.chat import router as chat_router
 from app.api.admin import router as admin_router
+from app.api.conversations import router as conversations_router
+from app.api.screening import router as screening_router
 from app.core import auth as auth_core
 from app.core.config import settings
 from app.db import models
 from app.db.session import db_session, engine
 from app.services import (
     redis_client, minio_client, qdrant_client as qd, llm_client, safety_gate,
-    calibration, metrics,
+    calibration, metrics, agent_client,
 )
 
 log = logging.getLogger("cbt")
@@ -38,6 +40,8 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"],
 app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(admin_router)
+app.include_router(conversations_router)
+app.include_router(screening_router)
 
 
 @app.on_event("startup")
@@ -81,6 +85,7 @@ def boot():
                         username=u["username"],
                         password_hash=auth_core.hash_password(u["password"]),
                         role=u["role"],
+                        email_verified=True,   # seed accounts skip OTP
                     ))
             s.flush()
         log.info("Seed users ready")
@@ -98,6 +103,7 @@ def health():
         "qdrant_path": settings.qdrant_local_path,
         "llm": llm_client.health(),
         "safety": safety_gate.health(),
+        "agent": agent_client.health(),
         "calibration": calibration.status(),
     }
 

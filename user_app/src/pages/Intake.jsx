@@ -124,8 +124,8 @@ export default function Intake({ onDone }) {
             disabled={busy}
             style={{ marginTop: 14 }}
           >
-            {busy && <span className="spinner" />}
-            Submit intake
+            {busy ? <span className="spinner" /> : null}
+            <span>Submit intake</span>
           </button>
         )}
       </div>

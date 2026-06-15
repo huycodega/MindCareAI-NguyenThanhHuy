@@ -49,10 +49,13 @@ image = (
 
 app = modal.App("cbt-safety")
 
-HF_REPO = os.environ.get("HF_SAFETY_MODEL_REPO", "Huysun29/cbt-qwen-7b")
+HF_REPO = os.environ.get("HF_SAFETY_MODEL_REPO", "Huysun29/cbt-qwen2.5-7b-v2")
 HF_BASE = os.environ.get("HF_SAFETY_BASE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+# v2 ships as a FULL MERGED model → load HF_REPO directly. Set "false" to use
+# the legacy base + LoRA path (e.g. the old cbt-qwen-7b adapter).
+SAFETY_IS_MERGED = os.environ.get("SAFETY_IS_MERGED", "true").lower() != "false"
 
-hf_secret = modal.Secret.from_name("hf-secret", required_keys=["HF_TOKEN"])
+hf_secret = modal.Secret.from_name("huggingface", required_keys=["HF_TOKEN"])
 
 SYSTEM_PROMPT = (
     "You are a mental health safety triage system trained as a clinical CBT "
@@ -73,37 +76,46 @@ SYSTEM_PROMPT = (
 # ─────────────────────────────────────────────────────────────────────────────
 # Modal class
 # ─────────────────────────────────────────────────────────────────────────────
+model_cache = modal.Volume.from_name("cbt-model-cache", create_if_missing=True)
+
 @app.cls(
-    gpu="T4",                      # 16 GB VRAM — sufficient for QWen-7B bf16
+    gpu="A100-80GB",
     image=image,
     secrets=[hf_secret],
-    container_idle_timeout=300,
-    timeout=120,
+    scaledown_window=300,
+    timeout=600,
+    startup_timeout=1800,
+    volumes={"/root/.cache/huggingface": model_cache},
 )
 class CBTSafetyService:
     @modal.enter()
     def load(self):
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer
-        from peft import PeftModel
         from huggingface_hub import login
 
         login(os.environ["HF_TOKEN"])
 
-        print(f"Loading safety base model: {HF_BASE}")
-        self.tokenizer = AutoTokenizer.from_pretrained(HF_BASE)
+        tok_src = HF_REPO if SAFETY_IS_MERGED else HF_BASE
+        print(f"Loading safety tokenizer: {tok_src}")
+        self.tokenizer = AutoTokenizer.from_pretrained(tok_src)
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
 
-        base = AutoModelForCausalLM.from_pretrained(
-            HF_BASE,
+        weights_src = HF_REPO if SAFETY_IS_MERGED else HF_BASE
+        print(f"Loading safety model: {weights_src} (merged={SAFETY_IS_MERGED})")
+        model = AutoModelForCausalLM.from_pretrained(
+            weights_src,
             torch_dtype=torch.bfloat16,
             device_map="auto",
         )
-        print(f"Attaching safety LoRA: {HF_REPO}")
-        self.model = PeftModel.from_pretrained(base, HF_REPO)
+        if not SAFETY_IS_MERGED:
+            from peft import PeftModel
+            print(f"Attaching safety LoRA: {HF_REPO}")
+            model = PeftModel.from_pretrained(model, HF_REPO)
+        self.model = model
         self.model.eval()
-        print("CBT QWen-7B safety gate ready.")
+        print(f"CBT safety gate ready: {HF_REPO}")
 
     @modal.method()
     def assess(self, messages: list) -> dict:
@@ -133,7 +145,9 @@ class CBTSafetyService:
         raw = self.tokenizer.decode(
             outputs[0][prompt_len:], skip_special_tokens=True).strip()
 
-        # Parse JSON from model output
+        print(f"[SAFETY RAW OUTPUT]: {repr(raw[:300])}")
+
+        # ── Try original format: {"level":"L0-3", ...} ──────────────────────
         m = re.search(r'\{[^{}]*"level"\s*:\s*"L[0-3]"[^{}]*\}', raw, re.S)
         if m:
             try:
@@ -144,22 +158,79 @@ class CBTSafetyService:
                     "reason": result.get("reason", ""),
                     "confidence": float(result.get("confidence", 0.7)),
                     "latency_ms": round((time.time() - t0) * 1000),
-                    "mode": "modal",
-                    "model": HF_REPO,
+                    "mode": "modal", "model": HF_REPO,
                 }
             except (json.JSONDecodeError, ValueError):
                 pass
 
-        # Fallback: scan for level keyword
-        for lv in ("L0", "L1", "L2", "L3"):
-            if lv in raw:
-                return {"level": lv, "severity": _lv_to_sev(lv),
-                        "reason": "parsed from model output",
-                        "confidence": 0.6, "mode": "modal_fallback"}
+        # ── cbt-qwen2.5-7b-v2 schema: {"risk_level":"normal|moderate|crisis|
+        #    out_of_scope", "rationale":..., ...}. Map risk_level → L0–L3. ─────
+        m2 = re.search(r'"risk_level"\s*:\s*"([a-z_]+)"', raw)
+        if m2:
+            level = _risk_to_level(m2.group(1))
+            reason = ""
+            try:
+                obj = json.loads(re.search(r'\{.*\}', raw, re.S).group())
+                reason = str(obj.get("rationale") or obj.get("reason")
+                             or obj.get("response") or "")[:150]
+            except Exception:
+                pass
+            return {
+                "level": level, "severity": _lv_to_sev(level),
+                "reason": reason, "confidence": 0.8,
+                "latency_ms": round((time.time() - t0) * 1000),
+                "mode": "modal", "model": HF_REPO,
+            }
 
-        return {"level": "L3", "severity": "low",
-                "reason": "model output unparseable — defaulting to L3",
-                "confidence": 0.3, "mode": "modal_fallback"}
+        # ── Try model's actual output format ─────────────────────────────────
+        # Model outputs: {"assessment":..., "next_steps":..., "recommendations":[...]}
+        try:
+            data = json.loads(raw)
+            assessment = (data.get("assessment", "") + " " +
+                          data.get("next_steps", "")).lower()
+            level = _infer_level(assessment)
+            return {
+                "level": level,
+                "severity": _lv_to_sev(level),
+                "reason": data.get("assessment", "")[:150],
+                "confidence": 0.72,
+                "latency_ms": round((time.time() - t0) * 1000),
+                "mode": "modal", "model": HF_REPO,
+            }
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+        # ── Keyword scan fallback ─────────────────────────────────────────────
+        low = raw.lower()
+        level = _infer_level(low)
+        return {"level": level, "severity": _lv_to_sev(level),
+                "reason": "inferred from model text",
+                "confidence": 0.5, "mode": "modal_text"}
+
+
+def _infer_level(text: str) -> str:
+    """Infer triage level from free-text model output."""
+    if any(w in text for w in ("suicid", "end my life", "want to die",
+                                "kill myself", "immediate danger", "crisis",
+                                "emergency", "life-threatening")):
+        return "L0"
+    if any(w in text for w in ("self-harm", "harm", "hopeless", "passive ideation",
+                                "high risk", "significant risk", "urgent")):
+        return "L1"
+    if any(w in text for w in ("depress", "anxi", "ptsd", "trauma", "distress",
+                                "moderate", "specialist", "professional",
+                                "further evaluation", "mental health")):
+        return "L2"
+    return "L3"
+
+
+def _risk_to_level(rl: str) -> str:
+    """Map the fine-tuned model's risk_level → triage level (safety-first).
+    'crisis' → L0 (no AI, crisis resources). The backend heuristic still runs
+    FIRST and splits L0 (active) vs L1 (passive) by keywords, so lumping crisis
+    into L0 here is the cautious default, never a downgrade."""
+    return {"crisis": "L0", "moderate": "L2",
+            "out_of_scope": "L2", "normal": "L3"}.get(rl, "L3")
 
 
 def _lv_to_sev(lv: str) -> str:
@@ -187,3 +258,24 @@ def health():
         "base": HF_BASE,
         "role": "safety_crisis_gate",
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Local debug entrypoint: modal run modal/safety_service.py
+# ─────────────────────────────────────────────────────────────────────────────
+@app.local_entrypoint()
+def debug():
+    svc = CBTSafetyService()
+    test_messages = [
+        "I feel anxious and avoid going to the shelter",
+        "I want to end my life, I can't take it anymore",
+        "I've been feeling very depressed lately",
+    ]
+    for text in test_messages:
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": f"[CLIENT MESSAGE]\n{text}"},
+        ]
+        result = svc.assess.remote(messages=messages)
+        print(f"\nInput: {text}")
+        print(f"Output: {result}")

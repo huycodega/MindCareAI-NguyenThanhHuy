@@ -1,11 +1,19 @@
 import { useState } from "react";
 import { api, setSession } from "../api.js";
+import Register from "./Register.jsx";
 
-export default function Login({ onAuth }) {
-  const [username, setU] = useState("user");
-  const [password, setP] = useState("user123");
+export default function Login({ onAuth, onBack }) {
+  const [mode, setMode] = useState("login"); // login | register
+  const [username, setU] = useState("");
+  const [password, setP] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+
+  if (mode === "register") {
+    return (
+      <Register onAuth={onAuth} onBackToLogin={() => setMode("login")} />
+    );
+  }
 
   async function submit(e) {
     e.preventDefault();
@@ -24,57 +32,53 @@ export default function Login({ onAuth }) {
 
   return (
     <div className="login-wrap">
-      <div className="card login-card">
-        <div className="eyebrow">CBT — Patient</div>
-        <h1 className="title" style={{ fontSize: 34 }}>
-          Talk through what's on your mind
-        </h1>
-        <p className="sub" style={{ marginBottom: 22 }}>
-          AI-assisted CBT techniques with clinician oversight on
-          sensitive cases. A licensed clinician reviews any response
-          when professional judgment is needed.
+      <div className="login-card">
+        {onBack && (
+          <button
+            onClick={onBack}
+            style={{
+              background: "none", border: "none", cursor: "pointer",
+              color: "var(--ink-soft)", fontSize: 13, fontFamily: "var(--font)",
+              marginBottom: 16, padding: 0, display: "flex", alignItems: "center", gap: 4,
+            }}
+          >
+            ← Back to home
+          </button>
+        )}
+        <div className="login-logo">🌿</div>
+        <div className="login-title">Welcome back</div>
+        <p className="login-sub">
+          A safe space to talk. CBT-guided support with a clinician
+          reviewing anything sensitive — AI never responds alone on critical cases.
         </p>
 
         <form onSubmit={submit}>
-          <label>Username</label>
-          <input
-            value={username}
-            onChange={(e) => setU(e.target.value)}
-            style={{ marginBottom: 14 }}
-          />
-          <label>Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setP(e.target.value)}
-            style={{ marginBottom: 18 }}
-          />
-          {err && (
-            <div className="banner crisis" style={{ marginTop: 0 }}>
-              {err}
-            </div>
-          )}
-          <button
-            className="btn accent"
-            disabled={busy}
-            style={{ width: "100%" }}
-          >
-            {busy && <span className="spinner" />}
+          <div className="field">
+            <label>Gmail or username</label>
+            <input value={username} onChange={(e) => setU(e.target.value)}
+              placeholder="you@gmail.com" autoFocus />
+          </div>
+          <div className="field">
+            <label>Password</label>
+            <input type="password" value={password} onChange={(e) => setP(e.target.value)} />
+          </div>
+          {err && <div className="banner crisis">{err}</div>}
+          <button className="btn accent full" disabled={busy} style={{ marginTop: 4 }}>
+            {busy ? <span className="spinner" /> : null}
             Sign in
           </button>
         </form>
 
         <div className="divider" />
-        <p className="mono" style={{ color: "var(--ink-soft)", fontSize: 11.5 }}>
-          DEMO PATIENT ACCOUNT<br />
-          user / user123
-        </p>
-        <p
-          className="mono"
-          style={{ color: "var(--ink-soft)", fontSize: 11, marginTop: 10 }}
-        >
-          Clinicians sign in at <b>http://localhost:5174</b>.
-        </p>
+        <div className="demo-hint">
+          New here?{" "}
+          <a href="#" onClick={(e) => { e.preventDefault(); setMode("register"); }}>
+            Create an account with Gmail
+          </a>
+        </div>
+        <div className="demo-hint" style={{ marginTop: 6, opacity: 0.7 }}>
+          Demo: <strong>user</strong> / <strong>user123</strong>
+        </div>
       </div>
     </div>
   );

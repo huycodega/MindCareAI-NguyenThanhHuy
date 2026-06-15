@@ -1,33 +1,33 @@
 """
-Retrieval orchestrator — hybrid dense + BM25 sparse with RRF fusion.
+Retrieval orchestrator v2 — risk-aware, role-routed, 3-store retriever.
 
-Pipeline (per rag-data-fixed.ipynb):
-  1. Dense search   — BAAI/bge-m3 embeddings in Qdrant (both collections)
-  2. Sparse search  — BM25Okapi loaded from cbt_rag_final/rag_outputs/*.pkl
-  3. RRF fusion     — score = Σ 1/(RRF_K + rank) across dense + sparse hits
-  4. Cross-encoder reranking — BAAI/bge-reranker-v2-m3 on top-N fused results
+This mirrors the retriever used in the M3/M4 evaluation (cbt_rag_eval_pipeline
+CBTRetriever) so the deployed system behaves like the version that was
+measured:
 
-Collections:
-  cbt_knowledge   — 2,824 pts: intents.json + CounselChat Q&A
-  cbt_examples    — 19,537 pts: MentalChat16K + Amod conversation examples
-  session_memory  — per-user prior sessions (app-managed)
+  bge-m3 (normalized) dense search per store, filtered by `risk_allowed`
+  + `doc_role`  →  bge-reranker-v2-m3 (sigmoid)  →  top-k
+  with role-aware routing (STORE_USAGE / ROLE_BY_RISK_AND_STORE /
+  QUERY_REWRITE_BY_RISK / STORE_PRIORITY), safety store capped at k=3,
+  dedupe by source_url+head, sort by rerank score.
 
-BM25 indexes are pickled as:
-  {bm25: BM25Okapi, chunks: [{"id":..., "text":..., "source":...}, ...]}
-and live at settings.bm25_rag1_path / settings.bm25_rag2_path.
+Stores (prefix = settings.rag_collection_prefix):
+  __cbt_knowledge_base      — CBT concepts / techniques / psychoeducation
+  __response_template_base  — response structures / communication templates
+  __safety_policy_base      — crisis / safety / boundary policy
 
-Graceful degradation:
-  - Missing BM25 files → dense-only (logged warning)
-  - Qdrant collection missing → collection skipped (logged warning)
-  - Reranker unavailable → RRF-scored order used directly
+`retrieve(query, risk_level, top_k)` returns chunks shaped for the rest of
+the pipeline (prompt_builder, grounding_nli, sessions.retrieved_ids):
+  {id, text, source_collection, doc_role, score_dense, score_rerank, payload}
+
+`should_use_rag(risk_level, chunks)` is the same minimal gate as the eval:
+only normal/moderate, and only if the top-1 rerank score ≥ rag_min_score.
+
+Graceful degradation: any store/search/rerank failure is logged and skipped;
+worst case retrieve() returns [] and chat.py proceeds without context.
 """
 import logging
-import os
-import pickle
-import re
-from typing import Dict, List, Optional, Tuple
-
-import numpy as np
+from typing import Dict, List, Tuple
 
 from app.core.config import settings
 from app.services import qdrant_client as qd
@@ -36,221 +36,147 @@ from app.services import embedder
 
 log = logging.getLogger(__name__)
 
-_TEXT_PAYLOAD_KEYS = ("text", "content", "chunk", "body", "passage")
-
-# ─────────────────────────────────────────────────────────────────────────────
-# BM25 lazy loader
-# ─────────────────────────────────────────────────────────────────────────────
-_bm25_rag1 = None
-_bm25_rag1_chunks: List[Dict] = []
-_bm25_rag2 = None
-_bm25_rag2_chunks: List[Dict] = []
-_bm25_loaded = False
-
-
-def _tokenize(text: str) -> List[str]:
-    text = re.sub(r"[^a-zA-Z0-9\s]", " ", text.lower())
-    return [t for t in text.split() if len(t) > 2]
-
-
-def _load_bm25() -> None:
-    global _bm25_rag1, _bm25_rag1_chunks, _bm25_rag2, _bm25_rag2_chunks, _bm25_loaded
-    if _bm25_loaded:
-        return
-    _bm25_loaded = True
-
-    for attr_bm25, attr_chunks, path, label in [
-        ("_bm25_rag1", "_bm25_rag1_chunks", settings.bm25_rag1_path, "RAG1"),
-        ("_bm25_rag2", "_bm25_rag2_chunks", settings.bm25_rag2_path, "RAG2"),
-    ]:
-        if not os.path.exists(path):
-            log.warning("BM25 pickle not found at %s (%s) — dense-only fallback",
-                        path, label)
-            continue
-        try:
-            with open(path, "rb") as f:
-                data = pickle.load(f)
-            globals()[attr_bm25] = data["bm25"]
-            globals()[attr_chunks] = data["chunks"]
-            log.info("BM25 %s loaded: %d docs from %s", label,
-                     len(data["chunks"]), path)
-        except Exception as e:
-            log.warning("BM25 %s load failed (%s) — dense-only fallback", label, e)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Per-collection search helpers
-# ─────────────────────────────────────────────────────────────────────────────
-def _extract_text(payload: Dict) -> str:
-    for k in _TEXT_PAYLOAD_KEYS:
-        v = payload.get(k)
-        if isinstance(v, str) and v.strip():
-            return v
-    return str(payload)[:500]
+# ── Router (copied verbatim from cbt_rag_eval_pipeline to stay in lockstep) ──
+STORE_USAGE = {
+    "cbt_knowledge_base":     {"use_when": ["normal", "moderate"]},
+    "response_template_base": {"use_when": ["normal", "moderate",
+                                            "out_of_scope", "crisis"]},
+    "safety_policy_base":     {"use_when": ["normal", "moderate", "crisis",
+                                            "out_of_scope", "self_harm",
+                                            "suicide",
+                                            "diagnosis_or_medication_request"]},
+}
+ROLE_BY_RISK_AND_STORE = {
+    "crisis": {
+        "safety_policy_base": ["crisis_policy", "risk_detection_policy"],
+        "response_template_base": ["crisis_response_template",
+                                   "communication_template"],
+    },
+    "out_of_scope": {
+        "safety_policy_base": ["ai_safety_boundary", "crisis_policy"],
+        "response_template_base": ["communication_template"],
+    },
+    "normal": {
+        "cbt_knowledge_base": ["cbt_knowledge", "cbt_technique_steps",
+                               "psychoeducation", "cbt_workbook",
+                               "cbt_worksheet"],
+        "response_template_base": ["response_structure",
+                                   "communication_template"],
+    },
+    "moderate": {
+        "cbt_knowledge_base": ["cbt_knowledge", "cbt_technique_steps",
+                               "psychoeducation", "cbt_workbook",
+                               "cbt_worksheet"],
+        "response_template_base": ["response_structure",
+                                   "communication_template"],
+    },
+}
+QUERY_REWRITE_BY_RISK = {
+    "crisis": ("suicide crisis safety plan warning signs coping strategies "
+               "emergency support 988 "),
+    "out_of_scope": ("medical advice medication dosage diagnosis boundary "
+                     "redirect to licensed healthcare professional "),
+    "normal": "", "moderate": "",
+}
+STORE_PRIORITY = ["safety_policy_base", "cbt_knowledge_base",
+                  "response_template_base"]
 
 
-def _dense_hits(query: str, collection: str, limit: int) -> List[Dict]:
+def _coll(store: str) -> str:
+    return f"{settings.rag_collection_prefix}__{store}"
+
+
+def _filter(risk_level: str, doc_roles):
+    """Qdrant payload filter: risk_allowed MatchAny + doc_role MatchAny."""
+    from qdrant_client.http import models as qm
+    must = [qm.FieldCondition(key="risk_allowed",
+                              match=qm.MatchAny(any=[risk_level]))]
+    if doc_roles:
+        must.append(qm.FieldCondition(key="doc_role",
+                                      match=qm.MatchAny(any=list(doc_roles))))
+    return qm.Filter(must=must)
+
+
+def _store_search(store: str, query: str, top_k: int,
+                  risk_level: str, doc_roles) -> List[Dict]:
+    coll = _coll(store)
     q_vec = embedder.embed_one(query)
     try:
-        hits = qd.search(collection, q_vec, limit=limit)
+        hits = qd.search(coll, q_vec, limit=settings.rag_prefetch_k,
+                         filter_dict=_filter(risk_level, doc_roles))
     except Exception as e:
-        log.warning("Qdrant search failed on %s: %s", collection, e)
+        log.warning("Qdrant search failed on %s: %s", coll, e)
         return []
-    return [
-        {"id": str(h.id), "score": float(h.score),
-         "payload": dict(h.payload or {})}
-        for h in hits
-    ]
-
-
-def _bm25_hits(query: str, bm25_obj, chunks: List[Dict],
-               limit: int) -> List[Dict]:
-    if bm25_obj is None or not chunks:
-        return []
-    tokens = _tokenize(query)
-    scores = bm25_obj.get_scores(tokens)
-    top_idx = np.argsort(scores)[::-1][:limit]
-    return [
-        {"id": chunks[i].get("id", f"bm25_{i}"),
-         "score": float(scores[i]),
-         "payload": chunks[i]}
-        for i in top_idx
-        if scores[i] > 0
-    ]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# RRF fusion
-# ─────────────────────────────────────────────────────────────────────────────
-def _rrf_fuse(dense: List[Dict], sparse: List[Dict],
-              k: int) -> List[Dict]:
-    """
-    Pure Reciprocal Rank Fusion.  score(d) = Σ 1 / (k + rank(d, list))
-    Scale-invariant: works regardless of whether dense scores are cosine
-    similarities (0–1) or BM25 raw counts.
-    """
-    combined: Dict[str, Dict] = {}
-
-    for rank, h in enumerate(dense):
-        cid = h["id"]
-        combined[cid] = {
-            "rrf_score": 1.0 / (k + rank),
-            "payload": h["payload"],
-            "id": cid,
-        }
-
-    for rank, h in enumerate(sparse):
-        cid = h["id"]
-        payload = h["payload"]
-        if cid in combined:
-            combined[cid]["rrf_score"] += 1.0 / (k + rank)
-        else:
-            combined[cid] = {
-                "rrf_score": 1.0 / (k + rank),
-                "payload": {
-                    "id": cid,
-                    "text": payload.get("text", ""),
-                    "source": payload.get("source", ""),
-                    "client_text": payload.get("client_text", ""),
-                    "counselor_text": payload.get("counselor_text", ""),
-                },
-                "id": cid,
-            }
-
-    return sorted(combined.values(), key=lambda x: x["rrf_score"], reverse=True)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Public retrieval API
-# ─────────────────────────────────────────────────────────────────────────────
-def retrieve(query: str,
-             top_k_per_collection: int = 10,
-             rerank_top_k: int = 5) -> List[Dict]:
-    """
-    Returns:
-      [
-        {
-          "id": str,
-          "score_dense": float,
-          "score_rerank": float,
-          "text": str,
-          "source_collection": "cbt_knowledge" | "cbt_examples",
-          "payload": {...full payload...}
-        },
-        ...
-      ]
-
-    Method:
-      For each collection: dense_search(top_k*3) + bm25_search(top_k*3)
-      → RRF fuse → take top_k per collection
-      → pool both collections → cross-encoder rerank → rerank_top_k
-    """
-    _load_bm25()
-
-    fetch_k = top_k_per_collection * 3   # wider net for RRF / reranker
-    rrf_k = settings.bm25_rrf_k
-
-    pool: List[Dict] = []
-
-    # ── cbt_knowledge ──────────────────────────────────────────────────────
-    dense_kb = _dense_hits(query, settings.qdrant_collection_kb, fetch_k)
-    sparse_kb = _bm25_hits(query, _bm25_rag1, _bm25_rag1_chunks, fetch_k)
-    fused_kb = _rrf_fuse(dense_kb, sparse_kb, rrf_k)
-
-    for item in fused_kb[:top_k_per_collection]:
-        pool.append({
-            "id": item["id"],
-            "score_dense": item["rrf_score"],
-            "text": _extract_text(item["payload"]),
-            "source_collection": settings.qdrant_collection_kb,
-            "payload": item["payload"],
-        })
-
-    # ── cbt_examples ───────────────────────────────────────────────────────
-    dense_ex = _dense_hits(query, settings.qdrant_collection_dialogues, fetch_k)
-    sparse_ex = _bm25_hits(query, _bm25_rag2, _bm25_rag2_chunks, fetch_k)
-    fused_ex = _rrf_fuse(dense_ex, sparse_ex, rrf_k)
-
-    for item in fused_ex[:top_k_per_collection]:
-        payload = item["payload"]
-        # For dialogue examples prefer the richer combined text
-        text = (payload.get("text") or
-                _build_dialogue_text(payload) or
-                _extract_text(payload))
-        pool.append({
-            "id": item["id"],
-            "score_dense": item["rrf_score"],
-            "text": text,
-            "source_collection": settings.qdrant_collection_dialogues,
-            "payload": payload,
-        })
-
-    if not pool:
+    if not hits:
         return []
 
-    # ── cross-encoder rerank ────────────────────────────────────────────────
-    cands = [p["text"] for p in pool]
+    passages = [(h.payload or {}).get("content", "") for h in hits]
     try:
-        ranked: List[Tuple[int, float]] = embedder.rerank(query, cands,
-                                                           top_k=rerank_top_k)
-        out = []
-        for orig_idx, score in ranked:
-            item = pool[orig_idx]
-            item["score_rerank"] = score
-            out.append(item)
-        return out
+        ranked = embedder.rerank(query, passages)   # sigmoid, sorted desc
     except Exception as e:
-        log.warning("Reranker failed (%s) — returning RRF order", e)
-        # Fallback: return pool sorted by RRF score, no rerank score
-        for item in pool:
-            item["score_rerank"] = item["score_dense"]
-        return pool[:rerank_top_k]
+        log.warning("Reranker failed on %s (%s) — dense order", coll, e)
+        ranked = [(i, float(getattr(hits[i], "score", 0.0) or 0.0))
+                  for i in range(len(hits))]
+
+    out = []
+    for orig_idx, rs in ranked[:top_k]:
+        h = hits[orig_idx]
+        pl = dict(h.payload or {})
+        out.append({
+            "id": str(h.id),
+            "text": pl.get("content", ""),
+            "source_collection": store,
+            "doc_role": pl.get("doc_role"),
+            "source_name": pl.get("source_name"),
+            "source_url": pl.get("source_url"),
+            "score_dense": float(getattr(h, "score", 0.0) or 0.0),
+            "score_rerank": float(rs),
+            "payload": pl,
+        })
+    return out
 
 
-def _build_dialogue_text(payload: Dict) -> str:
-    """Format a dialogue-collection payload as 'Client: ...\nCounselor: ...'."""
-    client = payload.get("client_text", "")
-    counselor = payload.get("counselor_text", "")
-    if client and counselor:
-        return f"Client: {client}\nCounselor: {counselor}"
-    return ""
+def retrieve(query: str, risk_level: str = "normal",
+             top_k: int = None) -> List[Dict]:
+    """Risk-routed multi-store retrieval. Returns reranked chunks (top_k)."""
+    top_k = top_k or settings.rag_final_top_k
+    rq = QUERY_REWRITE_BY_RISK.get(risk_level, "") + query
+
+    rows: List[Dict] = []
+    for store in STORE_PRIORITY:
+        if risk_level not in STORE_USAGE.get(store, {}).get("use_when", []):
+            continue
+        roles = ROLE_BY_RISK_AND_STORE.get(risk_level, {}).get(store)
+        if not roles:
+            continue
+        k = settings.rag_safety_top_k if store == "safety_policy_base" else top_k
+        rows += _store_search(store, rq, k, risk_level, roles)
+
+    # dedupe by source_url + first 200 chars, then sort by rerank score
+    seen, dedup = set(), []
+    for r in rows:
+        key = f"{r.get('source_url')}::{(r.get('text') or '')[:200]}"
+        if key in seen:
+            continue
+        seen.add(key)
+        dedup.append(r)
+    dedup.sort(key=lambda x: (x.get("score_rerank") or 0.0), reverse=True)
+    return dedup[:top_k]
+
+
+def should_use_rag(risk_level: str, chunks: List[Dict],
+                   min_score: float = None) -> Tuple[bool, str]:
+    """Minimal RAG gate (matches eval _should_use_rag): only normal/moderate
+    and only when the top-1 rerank score clears rag_min_score."""
+    min_score = settings.rag_min_score if min_score is None else min_score
+    if risk_level == "crisis":
+        return False, "crisis_no_rag"
+    if risk_level == "out_of_scope":
+        return False, "out_of_scope_no_rag"
+    if risk_level not in ("normal", "moderate"):
+        return False, "unsupported_risk_no_rag"
+    if not chunks:
+        return False, "no_context"
+    if (chunks[0].get("score_rerank") or 0.0) < min_score:
+        return False, "low_score"
+    return True, "use_rag"

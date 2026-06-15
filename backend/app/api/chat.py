@@ -27,11 +27,45 @@ from app.schemas.api import ChatIn
 from app.services import (
     safety_gate, analyzer, retrieval, prompt_builder, llm_client,
     post_process, preflight, pii_scrubber, redis_client as rc, calibration,
-    metrics, session_memory,
+    metrics, session_memory, agent, agent_client, user_memory,
 )
 
 
 router = APIRouter(prefix="/api")
+
+# how many prior turns of THIS thread to feed back as multi-turn context
+_HISTORY_TURNS = 6
+
+
+def _resolve_conversation(db, user_id, conversation_id, first_message):
+    """Return an owned Conversation, creating one if conversation_id is None.
+    Sets the title from the first message when the thread is still untitled."""
+    if conversation_id:
+        c = db.query(models.Conversation).filter_by(id=conversation_id).first()
+        if not c or str(c.user_id) != str(user_id):
+            raise HTTPException(404, "Conversation not found")
+    else:
+        c = models.Conversation(user_id=user_id, title="New conversation")
+        db.add(c); db.flush()
+    if c.title in (None, "", "New conversation"):
+        c.title = (first_message.strip()[:60] or "New conversation")
+    c.updated_at = datetime.now(timezone.utc)
+    return c
+
+
+def _thread_history(db, conversation_id):
+    """Last N turns of this thread as [{user, reply}] for prompt context."""
+    rows = (db.query(models.Session)
+              .filter_by(conversation_id=conversation_id)
+              .order_by(models.Session.created_at.asc())
+              .all())
+    rows = rows[-_HISTORY_TURNS:]
+    hist = []
+    for s in rows:
+        reply = (decrypt_str(s.final_reply_enc)
+                 if s.final_reply_enc else "")
+        hist.append({"user": decrypt_str(s.user_input_enc), "reply": reply})
+    return hist
 
 
 CRISIS_RESOURCES = {
@@ -93,8 +127,11 @@ def chat(body: ChatIn, request: Request,
     level = triage["triage_level"]
     metrics.inc("cbt_triage_level_total", level=level)
 
+    # ---- resolve / create the conversation thread (tasktab) ----
+    convo = _resolve_conversation(db, u.id, body.conversation_id, text)
+
     base = dict(
-        user_id=u.id, intake_id=intake.id,
+        user_id=u.id, intake_id=intake.id, conversation_id=convo.id,
         user_input_enc=encrypt_phi(text),
         user_input_hash=text_hash,
         triage_level=level,
@@ -112,6 +149,7 @@ def chat(body: ChatIn, request: Request,
                          detail=triage)
         return {
             "session_id": str(sess.id),
+            "conversation_id": str(convo.id),
             "outcome": "crisis",
             "triage": triage,
             "crisis_resources": CRISIS_RESOURCES,
@@ -131,7 +169,9 @@ def chat(body: ChatIn, request: Request,
                          ip=ip, resource_type="session", resource_id=sess.id,
                          detail=triage)
         return {
-            "session_id": str(sess.id), "outcome": "pending_review",
+            "session_id": str(sess.id),
+            "conversation_id": str(convo.id),
+            "outcome": "pending_review",
             "triage": triage, "crisis_resources": CRISIS_RESOURCES,
             "message": ("Your message will be reviewed by a clinician "
                          "directly. AI will not generate an automated reply."),
@@ -140,7 +180,8 @@ def chat(body: ChatIn, request: Request,
     # ---- L2 / L3: full pipeline ----
     analysis = analyzer.analyze(text, severity=triage["severity"])
 
-    # session context: prior count + last technique (simple now)
+    # session context: prior count + last technique + durable memory +
+    # the running history of THIS conversation thread (multi-turn).
     prior = (db.query(models.Session)
                .filter(models.Session.user_id == u.id,
                        models.Session.status.in_(["answered", "auto_sent"]))
@@ -149,6 +190,8 @@ def chat(body: ChatIn, request: Request,
         "prior_count": len(prior),
         "last_technique": prior[0].final_technique if prior else None,
         "summary": "(no summary yet)",   # extend later: LLM-summarize last N
+        "memory": user_memory.load_for_prompt(db, u.id),
+        "history": _thread_history(db, convo.id),
     }
 
     # intake snapshot for prompt
@@ -161,39 +204,121 @@ def chat(body: ChatIn, request: Request,
         "social_support": intake.social_support,
     }
 
-    # retrieval (Qdrant + rerank)
-    try:
-        with metrics.Timer("cbt_stage_latency_seconds", stage="retrieval"):
-            retrieved = retrieval.retrieve(
-                query=text,
-                top_k_per_collection=settings.retrieval_top_k // 2,
-                rerank_top_k=settings.retrieval_rerank_top_k)
-    except Exception:
-        retrieved = []
-    retrieved_ids = [r["id"] for r in retrieved]
-    metrics.observe("cbt_retrieval_count", len(retrieved))
-
-    # PII scrub before LLM
+    # PII scrub before any LLM / agent call
     scrubbed_text = pii_scrubber.scrub(text)
     scrubbed_intake = pii_scrubber.scrub_dict(
         intake_dict, ["presenting", "reason", "social_support"])
 
-    messages = prompt_builder.build_messages(
-        user_input_scrubbed=scrubbed_text,
-        intake=scrubbed_intake,
-        analysis=analysis,
-        session_ctx=session_ctx,
-        retrieved=retrieved,
-    )
-    p_hash = prompt_builder.prompt_hash(messages)
+    # Map deterministic triage level → retriever risk_level:
+    #   L3 routine → "normal", L2 moderate → "moderate". (L0/L1 never reach here.)
+    risk_level = "moderate" if level == "L2" else "normal"
 
-    # LLM call (circuit-broken)
-    with metrics.Timer("cbt_stage_latency_seconds", stage="llm_generate"):
-        gen = llm_client.generate(
-            messages,
-            n=body.n_responses or settings.n_responses,
-            temperature=body.temperature or settings.temperature)
-    drafts = post_process.parse_all(gen.get("responses", []))
+    # ════════════════════════════════════════════════════════════════════
+    # AGENTIC PATH (feature-flagged). When the orchestrator is enabled AND
+    # reachable, the Llama-3.1 brain runs a ReAct loop: it decides how much
+    # to retrieve / analyze / recall, then takes ONE terminal action
+    # (generate / ask_clarification / escalate). On ANY failure run_agent
+    # returns None and we fall back to the deterministic pipeline below.
+    # L0/L1 never reach here, and the agent can only RAISE caution.
+    # ════════════════════════════════════════════════════════════════════
+    agent_result = None
+    if agent_client.available():
+        try:
+            with metrics.Timer("cbt_stage_latency_seconds", stage="agent"):
+                agent_result = agent.run_agent(
+                    user_scrubbed=scrubbed_text, intake=scrubbed_intake,
+                    session_ctx=session_ctx, analysis=analysis,
+                    severity=triage["severity"], triage_level=level,
+                    user_id=str(u.id), risk_level=risk_level,
+                    n_responses=body.n_responses or settings.n_responses,
+                    temperature=body.temperature or settings.temperature)
+        except Exception:
+            agent_result = None
+
+    # ---- Agent terminal: ask a clarifying question (no full draft) ----
+    if agent_result and agent_result.get("outcome") == "needs_clarification":
+        question = agent_result["clarification"]
+        analysis["agent_trace"] = agent_result.get("trace")
+        sess = models.Session(
+            **base, status="answered", analysis=analysis,
+            final_reply_enc=encrypt_phi(question),
+            final_technique="clarification",
+            completed_at=datetime.now(timezone.utc))
+        db.add(sess); db.flush()
+        audit_mod.audit(db, action="agent_ask_clarification", actor=user,
+                         ip=ip, resource_type="session", resource_id=sess.id)
+        return {
+            "session_id": str(sess.id), "conversation_id": str(convo.id),
+            "outcome": "answered", "triage": triage,
+            "final": {"technique": "clarification", "response": question},
+            "drafts": [{"idx": 0, "technique": "clarification",
+                        "response": question}],
+            "mode": "agent",
+        }
+
+    # ---- Agent terminal: escalate to a clinician (force review even on L3) ----
+    if agent_result and agent_result.get("outcome") == "escalate":
+        reason = agent_result["escalate_reason"]
+        analysis["agent_trace"] = agent_result.get("trace")
+        analysis["agent_escalation"] = reason
+        sess = models.Session(**base, status="pending_review", analysis=analysis)
+        db.add(sess); db.flush()
+        db.add(models.ReviewQueue(
+            session_id=sess.id, triage_level=level, priority=1,
+            sla_due_at=_sla_for("L1")))
+        audit_mod.audit(db, action="agent_escalate_to_clinician", actor=user,
+                         ip=ip, resource_type="session", resource_id=sess.id,
+                         detail={"reason": reason})
+        return {
+            "session_id": str(sess.id), "conversation_id": str(convo.id),
+            "outcome": "pending_review", "triage": triage,
+            "message": ("Thank you for sharing. A clinician will follow up "
+                         "with you directly on this."),
+        }
+
+    # ---- Drafts: from the agent, OR from the deterministic pipeline ----
+    if agent_result and agent_result.get("outcome") == "drafts":
+        drafts = agent_result["drafts"]
+        retrieved = agent_result.get("retrieved") or []
+        analysis = agent_result.get("analysis") or analysis
+        analysis["agent_trace"] = agent_result.get("trace")
+        p_hash = agent_result.get("prompt_hash", "")
+        retrieved_ids = [r["id"] for r in retrieved]
+        gen_mode = agent_result.get("gen_mode", "agent")
+        metrics.observe("cbt_retrieval_count", len(retrieved))
+    else:
+        # ── deterministic pipeline: v2 risk-aware retrieval + gate ──
+        try:
+            with metrics.Timer("cbt_stage_latency_seconds", stage="retrieval"):
+                candidates = retrieval.retrieve(text, risk_level=risk_level,
+                                                top_k=settings.rag_final_top_k)
+        except Exception:
+            candidates = []
+        # Gate: inject context only when top-1 rerank is confident enough;
+        # otherwise generate with no context (exactly like the eval).
+        use_rag, gate_reason = retrieval.should_use_rag(risk_level, candidates)
+        retrieved = candidates if use_rag else []
+        retrieved_ids = [r["id"] for r in retrieved]
+        analysis["rag_gate"] = {"risk_level": risk_level, "used_rag": use_rag,
+                                "reason": gate_reason,
+                                "n_candidates": len(candidates)}
+        metrics.observe("cbt_retrieval_count", len(retrieved))
+
+        messages = prompt_builder.build_messages(
+            user_input_scrubbed=scrubbed_text,
+            intake=scrubbed_intake,
+            analysis=analysis,
+            session_ctx=session_ctx,
+            retrieved=retrieved,
+        )
+        p_hash = prompt_builder.prompt_hash(messages)
+        with metrics.Timer("cbt_stage_latency_seconds", stage="llm_generate"):
+            gen = llm_client.generate(
+                messages,
+                n=body.n_responses or settings.n_responses,
+                temperature=body.temperature or settings.temperature)
+        drafts = post_process.parse_all(gen.get("responses", []))
+        gen_mode = gen.get("mode", "modal")
 
     # pre-flight + grounding per-draft
     pf = preflight.check_all(drafts, triage["severity"])
@@ -231,8 +356,15 @@ def chat(body: ChatIn, request: Request,
         audit_mod.audit(db, action="triage_L2_draft_pending", actor=user,
                          ip=ip, resource_type="session", resource_id=sess.id,
                          detail={"n_drafts": len(drafts)})
+        # memory: record themes/technique even though reply is pending review
+        user_memory.update_after_turn(
+            db, u.id, analysis=analysis,
+            technique=drafts[0]["technique"] if drafts else None,
+            severity=triage["severity"])
         return {
-            "session_id": str(sess.id), "outcome": "pending_review",
+            "session_id": str(sess.id),
+            "conversation_id": str(convo.id),
+            "outcome": "pending_review",
             "triage": triage,
             "message": ("Thank you for sharing. A clinician is reviewing "
                          "the response for appropriateness. You will be "
@@ -263,14 +395,19 @@ def chat(body: ChatIn, request: Request,
                      ip=ip, resource_type="session", resource_id=sess.id,
                      detail={"technique": chosen["technique"]})
 
-    # best-effort session memory writeback (Qdrant)
+    # best-effort session memory writeback (Qdrant) + durable user memory
     try:
         session_memory.write_session(sess)
     except Exception:
         pass
+    user_memory.update_after_turn(
+        db, u.id, analysis=analysis,
+        technique=chosen["technique"], severity=triage["severity"])
 
     return {
-        "session_id": str(sess.id), "outcome": "answered",
+        "session_id": str(sess.id),
+        "conversation_id": str(convo.id),
+        "outcome": "answered",
         "triage": triage, "analysis": analysis,
         "drafts": [{"idx": i, "technique": d["technique"],
                     "response": d["response"]}
@@ -278,7 +415,7 @@ def chat(body: ChatIn, request: Request,
         "final": {"technique": chosen["technique"],
                   "response": chosen["response"]},
         "retrieved_count": len(retrieved),
-        "mode": gen.get("mode", "modal"),
+        "mode": gen_mode,
     }
 
 

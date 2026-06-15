@@ -106,8 +106,8 @@ export default function Consent({ onDone }) {
           disabled={!checked || busy}
           style={{ marginTop: 18 }}
         >
-          {busy && <span className="spinner" />}
-          Accept and continue
+          {busy ? <span className="spinner" /> : null}
+          <span>Accept and continue</span>
         </button>
       </div>
     </div>

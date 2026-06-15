@@ -87,7 +87,7 @@ _SAFETY_SYSTEM_PROMPT = (
 )
 
 
-def _call_modal(text: str, timeout: int = 15) -> Optional[Dict]:
+def _call_modal(text: str, timeout: int = 600) -> Optional[Dict]:
     """Call Modal-hosted cbt-qwen-7b safety endpoint. Returns None on failure."""
     url = settings.modal_safety_endpoint
     if not url:
@@ -111,27 +111,22 @@ def _call_modal(text: str, timeout: int = 15) -> Optional[Dict]:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             raw = json.loads(r.read().decode())
         latency = time.time() - t0
-        # Modal returns {"response": "...<json>..."} or {"responses": [...]}
-        text_out = (raw.get("response") or
-                    (raw.get("responses") or [""])[0])
-        # Extract JSON from model output
-        m = re.search(r'\{[^{}]*"level"\s*:\s*"L[0-3]"[^{}]*\}', text_out, re.S)
-        if not m:
-            log.warning("Safety model: no valid JSON in output: %s", text_out[:200])
-            return None
-        result = json.loads(m.group())
-        level = result.get("level", "")
-        if level not in ("L0", "L1", "L2", "L3"):
-            log.warning("Safety model: unexpected level=%s", level)
-            return None
-        return {
-            "triage_level": level,
-            "severity": result.get("severity", _level_to_severity(level)),
-            "confidence": float(result.get("confidence", 0.7)),
-            "reason": result.get("reason", "QWen safety model"),
-            "source": "cbt-qwen-7b",
-            "latency_ms": round(latency * 1000),
-        }
+
+        # Modal safety_service.py returns the triage dict directly:
+        # {"level":"L2","severity":"moderate","reason":"...","confidence":0.7,...}
+        level = raw.get("level", "")
+        if level in ("L0", "L1", "L2", "L3"):
+            return {
+                "triage_level": level,
+                "severity": raw.get("severity", _level_to_severity(level)),
+                "confidence": float(raw.get("confidence", 0.7)),
+                "reason": raw.get("reason", "QWen safety model"),
+                "source": "cbt-qwen-7b",
+                "latency_ms": round(latency * 1000),
+            }
+
+        log.warning("Safety model unexpected response: %r", str(raw)[:200])
+        return None
     except Exception as e:
         log.warning("Safety Modal call failed (%s) — heuristic fallback", e)
         return None
@@ -148,26 +143,34 @@ def assess(text: str) -> Dict:
     """
     Assess safety level of client message.
 
-    Returns:
-        {triage_level, severity, confidence, reason, source,
-         optionally latency_ms}
-
-    Priority:
-        1. Modal endpoint (cbt-qwen-7b) when MODAL_SAFETY_ENDPOINT is set
-        2. Heuristic regex fallback (always fast, always available)
+    Priority logic (safety-first):
+        1. Heuristic L0/L1 → ALWAYS use heuristic (never override crisis)
+        2. Modal cbt-qwen-7b → for L2/L3 nuanced assessment
+        3. Heuristic fallback → when Modal unavailable
     """
+    # Heuristic first — crisis keywords are hard overrides
+    heuristic = _heuristic(text)
+    if heuristic["triage_level"] in ("L0", "L1"):
+        log.info("Safety heuristic hard override: %s", heuristic["triage_level"])
+        return heuristic
+
     # In mock/dev mode skip the network call entirely
     if settings.mock_llm:
-        return _heuristic(text)
+        return heuristic
 
+    # For L2/L3: call Modal model for nuanced assessment
     result = _call_modal(text)
     if result is not None:
+        # Never let model downgrade a heuristic L2 to L3 if keywords match
+        if (heuristic["triage_level"] == "L2" and
+                result["triage_level"] == "L3"):
+            result["triage_level"] = "L2"
+            result["severity"] = "moderate"
+            result["reason"] += " (upgraded by heuristic)"
         return result
 
-    # Heuristic covers endpoint-down / unset / parse-failure cases
-    out = _heuristic(text)
-    log.info("Safety triage heuristic fallback: level=%s", out["triage_level"])
-    return out
+    log.info("Safety triage heuristic fallback: level=%s", heuristic["triage_level"])
+    return heuristic
 
 
 def health() -> Dict:

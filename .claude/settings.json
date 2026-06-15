@@ -5,7 +5,44 @@
       "PowerShell(Head-Object -n 20)",
       "Read(//c/Program Files/Git/bin/**)",
       "Read(//c/Program Files/**)",
-      "PowerShell(New-Item -ItemType File -Path \"d:\\\\AI PROJECT\\\\cbt_v4\\\\.env.example\" -Force)"
+      "PowerShell(New-Item -ItemType File -Path \"d:\\\\AI PROJECT\\\\cbt_v4\\\\.env.example\" -Force)",
+      "WebFetch(domain:github.com)"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "cd \"d:/AI PROJECT/cbt_v4/C2-App-109/C2-App-109\" && python scripts/log_hook.py --tool=claude || true"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "cd \"d:/AI PROJECT/cbt_v4/C2-App-109/C2-App-109\" && python scripts/log_hook.py --tool=claude || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "cd \"d:/AI PROJECT/cbt_v4/C2-App-109/C2-App-109\" && python scripts/log_hook.py --tool=claude || true"
+          }
+        ]
+      }
     ]
   }
 }
