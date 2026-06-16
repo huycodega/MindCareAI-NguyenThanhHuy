@@ -240,7 +240,9 @@ def _tool_recall_memory(args: Dict, state: Dict) -> str:
     for h in hits:
         payload = dict(getattr(h, "payload", {}) or {})
         out.append(payload.get("text", "")[:300])
-    return "Prior sessions:\n" + "\n---\n".join(out)
+    return ("Prior sessions for THIS client (routing context only — use to "
+            "stay consistent, do NOT quote back as 'our talks'/'as we "
+            "discussed'):\n" + "\n---\n".join(out))
 
 
 def _tool_analyze(args: Dict, state: Dict) -> str:
@@ -254,6 +256,19 @@ def _tool_analyze(args: Dict, state: Dict) -> str:
     return (f"Emotion: {analysis.get('emotion')}; "
             f"Distortions: {analysis.get('cognitive_distortions')}; "
             f"Technique hint: {analysis.get('technique_hint')}")
+
+
+def _ensure_grounded(state: Dict, trace: List[Dict], step: int) -> None:
+    """Guarantee the responder gets at least one retrieval before generating.
+    The orchestrator often shortcuts straight to generate_cbt_response; an
+    ungrounded reply is exactly what we don't want, so when nothing has been
+    retrieved yet we auto-retrieve using the client's own message."""
+    if state.get("retrieved"):
+        return
+    res = _tool_retrieve({"query": state["user_scrubbed"]}, state)
+    trace.append({"step": step, "tool": "retrieve_cbt_knowledge",
+                  "arguments": {"query": state["user_scrubbed"][:80]},
+                  "result": res[:200], "note": "auto-grounding (forced before generate)"})
 
 
 def _do_generate(args: Dict, state: Dict,
@@ -343,6 +358,7 @@ def run_agent(*, user_scrubbed: str,
             # still produce a response; otherwise fall back entirely.
             if state["retrieved"] or state.get("analysis"):
                 log.info("Agent orchestrator dropped — forcing generate")
+                _ensure_grounded(state, trace, step)
                 result = _do_generate({}, state, n_responses, temperature)
                 result["trace"] = trace + [{"step": step, "tool": "_forced_generate",
                                             "note": "orchestrator unreachable"}]
@@ -364,12 +380,18 @@ def run_agent(*, user_scrubbed: str,
                           "content": content[:200]})
             continue
 
+        # Run context-gathering tools BEFORE any terminal action in the same
+        # batch — the model sometimes lists generate_cbt_response first, which
+        # would otherwise generate before retrieve/analyze had run.
+        tool_calls.sort(key=lambda c: 1 if c.get("name") in _TERMINAL else 0)
+
         # Execute calls in order; stop at the first terminal action.
         for call in tool_calls:
             name = call.get("name", "")
             args = call.get("arguments") or {}
 
             if name == "generate_cbt_response":
+                _ensure_grounded(state, trace, step)   # never generate ungrounded
                 result = _do_generate(args, state, n_responses, temperature)
                 trace.append({"step": step, "tool": name, "arguments": args})
                 result["trace"] = trace
@@ -407,6 +429,7 @@ def run_agent(*, user_scrubbed: str,
     # client is never left hanging.
     log.info("Agent hit step budget (%d) — forcing generate",
              settings.agent_max_steps)
+    _ensure_grounded(state, trace, settings.agent_max_steps)
     result = _do_generate({}, state, n_responses, temperature)
     result["trace"] = trace + [{"step": settings.agent_max_steps,
                                 "tool": "_forced_generate",
