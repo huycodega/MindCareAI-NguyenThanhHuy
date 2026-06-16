@@ -10,36 +10,15 @@
     ]
   },
   "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "cd \"d:/AI PROJECT/cbt_v4/C2-App-109/C2-App-109\" && python scripts/log_hook.py --tool=claude || true"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": ".*",
-        "hooks": [
-          {
-            "type": "command",
-            "shell": "bash",
-            "command": "cd \"d:/AI PROJECT/cbt_v4/C2-App-109/C2-App-109\" && python scripts/log_hook.py --tool=claude || true"
-          }
-        ]
-      }
-    ],
     "Stop": [
       {
         "hooks": [
           {
             "type": "command",
             "shell": "bash",
-            "command": "cd \"d:/AI PROJECT/cbt_v4/C2-App-109/C2-App-109\" && python scripts/log_hook.py --tool=claude || true"
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"E:/duanVIN/C2-App-109/.claude/ai-stop-log.ps1\" 2>/dev/null || true",
+            "timeout": 30,
+            "statusMessage": "Ghi ai-log..."
           }
         ]
       }

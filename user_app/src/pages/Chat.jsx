@@ -1,231 +1,225 @@
 import { useState, useEffect, useRef } from "react";
 import { api } from "../api.js";
 import Mascot from "../components/Mascot.jsx";
-import PageHero from "../components/PageHero.jsx";
 
-const TRIAGE_LABEL = {
-  L0: "Emergency",
-  L1: "High risk — Clinician notified",
-  L2: "Pending review",
-  L3: "Routine",
+/* ── Inline icon set ───────────────────────────────────────────── */
+const ICON_PATHS = {
+  sparkle:  <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" />,
+  play:     <path d="M8 5.5l10 6.5-10 6.5z" fill="currentColor" stroke="none" />,
+  arrow:    <><path d="M5 12h13" /><path d="M12 6l6 6-6 6" /></>,
+  chevron:  <path d="M9 6l6 6-6 6" />,
+  phone:    <path d="M5 4h4l2 5-3 2c1 3 3 5 6 6l2-3 5 2v4c0 1-1 2-2 2C9 22 2 15 2 6c0-1 1-2 3-2z" />,
+  chat:     <path d="M21 12a8 8 0 0 1-11.5 7.2L4 21l1.8-5.5A8 8 0 1 1 21 12z" />,
+  shield:   <path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" />,
+  paperclip:<path d="M20 11l-8.5 8.5a5 5 0 0 1-7-7L12 4a3.4 3.4 0 0 1 4.9 4.8l-8 8a1.8 1.8 0 0 1-2.6-2.5l7.4-7.4" />,
+  send:     <><path d="M5 12h13" /><path d="M12 6l6 6-6 6" /></>,
+  wind:     <><path d="M3 8.5h8.5A2.5 2.5 0 1 0 9 6" /><path d="M3 12.5h12A2.5 2.5 0 1 1 12.5 15" /><path d="M3 16.5h6.5A2 2 0 1 1 7.5 18.5" /></>,
+  refresh:  <><path d="M4.5 11a7.5 7.5 0 0 1 12.8-4.3L20 9" /><path d="M20 4v5h-5" /><path d="M19.5 13a7.5 7.5 0 0 1-12.8 4.3L4 15" /><path d="M4 20v-5h5" /></>,
+  heart:    <path d="M12 20s-7-4.4-9.3-8.8C1.2 8 2.8 4.7 6.2 4.7c2 0 3.2 1.2 3.8 2.2.6-1 1.8-2.2 3.8-2.2 3.4 0 5 3.3 3.5 6.5C19 15.6 12 20 12 20z" />,
+  edit:     <><path d="M4 20h4L18 10l-4-4L4 16z" /><path d="M13.5 6.5l4 4" /></>,
+  check:    <path d="M5 12l4 4 10-10" />,
+  swap:     <><path d="M7 7h11l-3-3" /><path d="M17 17H6l3 3" /></>,
+  journal:  <><rect x="5" y="3" width="14" height="18" rx="2" /><path d="M9 3v18M12 8h4M12 12h4" /></>,
+  moon:     <path d="M21 13A8 8 0 1 1 11 3a6 6 0 0 0 10 10z" />,
 };
 
-const PROMPT_CHIPS = [
-  { label: "Anxiety",        text: "I've been feeling really anxious lately and I can't calm down." },
-  { label: "Work stress",    text: "Work has been overwhelming and I feel burned out." },
-  { label: "Can't sleep",    text: "I keep overthinking at night and can't fall asleep." },
-  { label: "Feeling down",   text: "I've been feeling down and unmotivated for a while." },
-  { label: "Relationships",  text: "I'm struggling with a relationship and don't know what to do." },
+function Icon({ name, size = 18, className = "", stroke = 1.7 }) {
+  return (
+    <svg className={className} width={size} height={size} viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" strokeWidth={stroke} strokeLinecap="round" strokeLinejoin="round">
+      {ICON_PATHS[name]}
+    </svg>
+  );
+}
+
+/* Double-check read receipt */
+function ReadCheck() {
+  return (
+    <svg className="ai-read" width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 12.5l4 4 8.5-9" />
+      <path d="M9.5 16.5l1 1 8.5-9" />
+    </svg>
+  );
+}
+
+/* ── Topic chips ───────────────────────────────────────────────── */
+const TOPICS = [
+  { label: "Anxiety",  emoji: "😟", text: "I've been feeling anxious lately and I'm not sure why." },
+  { label: "Stress",   emoji: "😣", text: "I've been under a lot of stress recently." },
+  { label: "Insomnia", emoji: "🌙", text: "I'm having trouble sleeping at night." },
+  { label: "Sad",      emoji: "😢", text: "I've been feeling sad and low on energy." },
+  { label: "Lonely",   emoji: "🫥", text: "I've been feeling lonely these days." },
 ];
 
-function CrisisResources({ res }) {
-  if (!res) return null;
-  return (
-    <div className="crisis-box">
-      <div className="crisis-title">🆘 Crisis Support Available Now</div>
-      {Object.values(res).map((r) => (
-        <div key={r.name} className="crisis-item">
-          <strong>{r.name}</strong>
-          <span>{r.phone}</span>
-          <a href={r.url} target="_blank" rel="noreferrer">
-            {r.url}
-          </a>
-        </div>
+const QUICK_REPLIES = [
+  { icon: "edit",  text: "How can I worry less?" },
+  { icon: "check", text: "I'm having trouble focusing 😟" },
+  { icon: "swap",  text: "I often compare myself to others" },
+];
+
+/* ── Seed conversation (matches mockup) ────────────────────────── */
+const SEED = [
+  { role: "ai", time: "09:30",
+    text: "Hi Minh! 👋\nI'm MindCare AI, here to listen and be with you. What would you like to share today?" },
+  { role: "user", time: "09:31", read: true,
+    text: "Lately I've been worrying about the future, and I'm not sure if I'm heading in the right direction." },
+  { role: "ai", time: "09:33",
+    text: "Thank you for sharing this with me. 🤗\nWorrying about the future is completely normal, especially when we're facing many choices or changes.\n\nYou can start small: identify 1–2 nearest goals, break the steps down, and take time to care for yourself each day.\n\nIf you'd like, I can suggest an exercise to help ease anxiety right now. Would you like to try?" },
+  { role: "user", time: "09:34", read: true, text: "I'd like to try, thank you!" },
+];
+
+function nowTime() {
+  return new Date().toTimeString().slice(0, 5);
+}
+
+/* Render text with paragraph + line breaks preserved */
+function MsgText({ text }) {
+  return text.split("\n\n").map((para, i) => (
+    <p key={i} className="ai-p">
+      {para.split("\n").map((line, j) => (
+        <span key={j}>{j > 0 && <br />}{line}</span>
       ))}
-    </div>
-  );
+    </p>
+  ));
 }
 
-function TypingDots() {
+/* ── Chat bubble ───────────────────────────────────────────────── */
+function ChatBubble({ msg }) {
+  const isAI = msg.role === "ai";
   return (
-    <div className="bubble bubble-ai">
-      <div className="bubble-avatar"><Mascot variant="chat" size={34} /></div>
-      <div className="bubble-body typing-dots">
-        <span />
-        <span />
-        <span />
-      </div>
-    </div>
-  );
-}
-
-function TriageBadge({ level }) {
-  if (!level) return null;
-  return (
-    <span className={`triage-badge triage-${level}`}>
-      <span className="triage-dot" />
-      {level} · {TRIAGE_LABEL[level]}
-    </span>
-  );
-}
-
-// Convert backend conversation messages → local render shape.
-function hydrate(messages) {
-  const out = [];
-  for (const m of messages) {
-    if (m.role === "user") {
-      out.push({ role: "user", text: m.content });
-    } else if (m.role === "assistant") {
-      out.push({
-        role: "ai",
-        outcome: "answered",
-        response: m.content,
-        technique: m.technique,
-      });
-    } else if (m.role === "system") {
-      const isCrisis = m.status === "crisis";
-      out.push({
-        role: "ai",
-        outcome: isCrisis ? "crisis" : "pending",
-        triage: { triage_level: m.triage_level },
-        message: m.content,
-      });
-    }
-  }
-  return out;
-}
-
-const MOOD_WEEK = ["😊","🙂","😊","😐","😔"];
-
-function RightPanel({ onUseTip, conversations, activeId, onOpenConvo }) {
-  return (
-    <div className="chat-right-panel">
-
-      {/* Streak tracker */}
-      <div className="rp-streak-card">
-        <div className="rp-streak-left">
-          <div className="rp-streak-num">5</div>
-          <div className="rp-streak-label">Day streak 🔥</div>
-        </div>
-        <div className="rp-streak-moods">
-          {MOOD_WEEK.map((e, i) => <span key={i} className="rp-mood-dot">{e}</span>)}
-        </div>
-      </div>
-
-      {/* Today's tip — compact */}
-      <div className="rp-tip-card">
-        <div className="rp-tip-top">
-          <span className="rp-tip-icon">💡</span>
-          <span className="rp-tip-label">Today's Tip</span>
-          <Mascot variant="success" size={44} style={{ marginLeft: "auto", flexShrink: 0 }} />
-        </div>
-        <div className="rp-tip-text">
-          Name 3 things you can see, hear, and feel. Grounding pulls you back to the present.
-        </div>
-      </div>
-
-      {/* Recent conversations */}
-      {conversations.length > 0 && (
-        <div className="rp-recent-card">
-          <div className="rp-recent-title">Recent chats</div>
-          {conversations.slice(0, 3).map((c) => (
-            <button
-              key={c.id}
-              className={`rp-convo-item ${c.id === activeId ? "active" : ""}`}
-              onClick={() => onOpenConvo(c.id)}
-            >
-              <span className="rp-convo-icon">💬</span>
-              <span className="rp-convo-title">{c.title}</span>
-            </button>
-          ))}
-        </div>
+    <div className={`ai-row ${isAI ? "ai" : "user"}`}>
+      {isAI && (
+        <div className="ai-avatar"><Mascot variant="chat" size={30} /></div>
       )}
-
-      {/* Breathing exercise */}
-      <div className="breathing-card">
-        <div className="breathing-icon">🌬️</div>
-        <div className="breathing-title">4-7-8 Breathing</div>
-        <div className="breathing-text">
-          Inhale 4s · hold 7s · exhale 8s. Ease tension fast.
+      <div className="ai-msg">
+        <div className={`ai-bubble ${isAI ? "ai-bubble-ai" : "ai-bubble-user"} ${msg.error ? "ai-bubble-error" : ""}`}>
+          <MsgText text={msg.text} />
+          {msg.crisis && (
+            <div className="ai-bubble-hotline">
+              <Icon name="phone" size={16} />
+              <span>If you're in crisis, call <strong>1900 1234</strong> — available 24/7.</span>
+            </div>
+          )}
         </div>
-        <button
-          className="breathing-btn"
-          onClick={() => onUseTip("Can you guide me through the 4-7-8 breathing exercise?")}
-        >
-          Start now
+        <div className="ai-meta">
+          <span>{msg.time}</span>
+          {!isAI && msg.read && <ReadCheck />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TypingBubble() {
+  return (
+    <div className="ai-row ai">
+      <div className="ai-avatar"><Mascot variant="chat" size={30} /></div>
+      <div className="ai-bubble ai-bubble-ai ai-typing">
+        <span /><span /><span />
+      </div>
+    </div>
+  );
+}
+
+/* ── Breathing progress ring ───────────────────────────────────── */
+function BreathingRing({ progress = 0.68 }) {
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  return (
+    <svg className="ai-ring" width="64" height="64" viewBox="0 0 64 64">
+      <circle cx="32" cy="32" r={r} fill="none" stroke="#E2F1EC" strokeWidth="7" />
+      <circle cx="32" cy="32" r={r} fill="none" stroke="#14b8a6" strokeWidth="7"
+        strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - progress)}
+        transform="rotate(-90 32 32)" />
+      <circle cx="32" cy="32" r="9" fill="#E7F6F1" />
+    </svg>
+  );
+}
+
+/* ── Right panel ───────────────────────────────────────────────── */
+function RightPanel({ onUseTip }) {
+  return (
+    <aside className="ai-side">
+      {/* Quick suggestions */}
+      <div className="ai-card">
+        <div className="ai-card-title"><Icon name="sparkle" size={17} /> Quick Suggestions</div>
+        <button className="ai-sug" onClick={() => onUseTip("Can you guide me through a 5-minute anxiety relief exercise?")}>
+          <div className="ai-sug-text">
+            <div className="ai-sug-t">5-Minute Anxiety Relief</div>
+            <div className="ai-sug-s">Relax quickly and regain balance</div>
+          </div>
+          <span className="ai-sug-btn ai-sug-play"><Icon name="play" size={13} /></span>
+        </button>
+        <button className="ai-sug" onClick={() => onUseTip("How do I write an emotion journal?")}>
+          <div className="ai-sug-text">
+            <div className="ai-sug-t">Write an Emotion Journal</div>
+            <div className="ai-sug-s">Understand yourself better every day</div>
+          </div>
+          <span className="ai-sug-btn"><Icon name="chevron" size={16} /></span>
         </button>
       </div>
 
-      {/* Emergency hotline */}
-      <div className="emergency-card-chat">
-        <div className="emergency-chat-title">🆘 Emergency Hotline</div>
-        <div className="emergency-chat-text">
-          In crisis? You're not alone — reach out now.
+      {/* Breathing exercise */}
+      <div className="ai-card">
+        <div className="ai-breath-top">
+          <div>
+            <div className="ai-card-title ai-card-title-teal"><Icon name="wind" size={17} /> 4-7-8 Breathing Exercise</div>
+            <p className="ai-breath-text">Deep breathing helps your body and mind relax effectively.</p>
+          </div>
+          <BreathingRing />
         </div>
-        <a className="emergency-chat-phone" href="tel:1800599920">📞 1800 599 920</a>
-        <div className="emergency-chat-sub">24/7 · Free & confidential</div>
+        <button className="ai-btn-primary ai-btn-full" onClick={() => onUseTip("Can you guide me through the 4-7-8 breathing exercise?")}>
+          Start
+        </button>
+        <div className="ai-breath-steps">4s inhale • 7s hold • 8s exhale</div>
       </div>
-    </div>
+
+      {/* You're not alone */}
+      <div className="ai-card">
+        <div className="ai-card-title"><Icon name="chat" size={17} /> You're Not Alone</div>
+        <p className="ai-card-text">If you're struggling or having negative thoughts, please seek help right away.</p>
+        <div className="ai-hotline">
+          <span className="ai-hotline-icon"><Icon name="phone" size={18} /></span>
+          <div>
+            <div className="ai-hotline-label">24/7 Support Hotline</div>
+            <a className="ai-hotline-num" href="tel:19001234">1900 1234</a>
+          </div>
+        </div>
+      </div>
+
+      {/* Always here */}
+      <div className="ai-card ai-always">
+        <div className="ai-always-mascot"><Mascot variant="wave" size={88} /></div>
+        <div className="ai-always-body">
+          <div className="ai-card-title">MindCare AI is always here 💚</div>
+          <p className="ai-card-text">Whether it's a good day or not, you can always share with me anytime.</p>
+          <button className="ai-btn-primary ai-btn-sm" onClick={() => onUseTip("I just wanted to check in and share how I'm doing today.")}>
+            Send Encouragement 💚
+          </button>
+        </div>
+      </div>
+    </aside>
   );
 }
 
+/* ── Page ──────────────────────────────────────────────────────── */
 export default function Chat() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const [conversations, setConversations] = useState([]);
+  const [messages, setMessages] = useState(SEED);
   const [activeId, setActiveId] = useState(null);
-  const [memory, setMemory] = useState(null);
-  const [histOpen, setHistOpen] = useState(false);
   const bottomRef = useRef(null);
-  const textareaRef = useRef(null);
+  const inputRef = useRef(null);
   const pollRef = useRef(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  useEffect(() => {
-    refreshSidebar();
-    return () => clearInterval(pollRef.current);
-  }, []);
+  useEffect(() => () => clearInterval(pollRef.current), []);
 
-  async function refreshSidebar() {
-    try {
-      const [c, m] = await Promise.all([
-        api.listConversations(),
-        api.myMemory().catch(() => null),
-      ]);
-      setConversations(c.conversations || []);
-      setMemory(m);
-    } catch {}
-  }
-
-  async function openConversation(cid) {
-    clearInterval(pollRef.current);
-    setActiveId(cid);
-    setHistOpen(false);
-    try {
-      const c = await api.getConversation(cid);
-      setMessages(hydrate(c.messages || []));
-    } catch {
-      setMessages([]);
-    }
-  }
-
-  function newConversation() {
-    clearInterval(pollRef.current);
-    setActiveId(null);
-    setMessages([]);
-    setInput("");
-    setHistOpen(false);
-    textareaRef.current?.focus();
-  }
-
-  async function deleteConversation(cid) {
-    try {
-      await api.deleteConversation(cid);
-      if (cid === activeId) newConversation();
-      refreshSidebar();
-    } catch {}
-  }
-
-  function useChip(text) {
-    setInput(text);
-    textareaRef.current?.focus();
-  }
-
-  function startPolling(sid, msgIdx) {
+  function startPolling(sid, idx) {
     clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
@@ -234,21 +228,13 @@ export default function Chat() {
           clearInterval(pollRef.current);
           setMessages((prev) => {
             const next = [...prev];
-            if (s.status === "answered") {
-              next[msgIdx] = {
-                ...next[msgIdx],
-                outcome: "answered_reviewed",
-                response: s.final_reply,
-                technique: s.final_technique,
-              };
-            } else {
-              next[msgIdx] = {
-                ...next[msgIdx],
-                outcome: "rejected",
-                response:
-                  "The clinician determined a different approach is needed. Please reach out directly.",
-              };
-            }
+            next[idx] = {
+              role: "ai",
+              time: nowTime(),
+              text: s.status === "answered"
+                ? s.final_reply
+                : "A clinician determined a different approach is needed. Please reach out directly for support.",
+            };
             return next;
           });
         }
@@ -256,69 +242,43 @@ export default function Chat() {
     }, 4000);
   }
 
-  async function send() {
-    const text = input.trim();
+  async function sendText(raw) {
+    const text = (raw ?? input).trim();
     if (!text || busy) return;
-    setInput("");
 
-    const userMsg = { role: "user", text };
     const aiIdx = messages.length + 1;
-    setMessages((prev) => [...prev, userMsg, { role: "ai", outcome: "loading" }]);
+    setMessages((prev) => [...prev, { role: "user", time: nowTime(), read: true, text }, { role: "ai", typing: true }]);
+    setInput("");
     setBusy(true);
 
     try {
       const r = await api.chat(text, activeId ? { conversation_id: activeId } : {});
+      if (r.conversation_id && r.conversation_id !== activeId) setActiveId(r.conversation_id);
 
-      const newId = r.conversation_id || activeId;
-      const wasNew = !activeId;
-      if (newId && newId !== activeId) setActiveId(newId);
-
-      if (r.outcome === "crisis") {
-        setMessages((prev) => {
-          const next = [...prev];
-          next[aiIdx] = {
-            role: "ai",
-            outcome: "crisis",
-            triage: r.triage,
-            message: r.message,
-            crisisResources: r.crisis_resources,
-          };
-          return next;
-        });
+      let replyText;
+      let crisis = false;
+      if (r.outcome === "answered") {
+        replyText = r.final?.response || "I'm here with you.";
+      } else if (r.outcome === "crisis") {
+        replyText = r.message || "I'm really glad you reached out. Your safety matters most right now.";
+        crisis = true;
       } else if (r.outcome === "pending_review") {
-        setMessages((prev) => {
-          const next = [...prev];
-          next[aiIdx] = {
-            role: "ai",
-            outcome: "pending",
-            triage: r.triage,
-            message: r.message,
-            crisisResources: r.crisis_resources,
-            sessionId: r.session_id,
-          };
-          return next;
-        });
-        startPolling(r.session_id, aiIdx);
-      } else if (r.outcome === "answered") {
-        setMessages((prev) => {
-          const next = [...prev];
-          next[aiIdx] = {
-            role: "ai",
-            outcome: "answered",
-            triage: r.triage,
-            response: r.final?.response,
-            technique: r.final?.technique,
-            alternatives: r.drafts?.slice(1) || [],
-          };
-          return next;
-        });
+        replyText = r.message || "Thank you for sharing. A clinician is reviewing your message and will respond shortly.";
+      } else {
+        replyText = r.message || "I'm here with you.";
       }
 
-      if (wasNew || r.outcome === "answered") refreshSidebar();
-    } catch (e) {
       setMessages((prev) => {
         const next = [...prev];
-        next[aiIdx] = { role: "ai", outcome: "error", message: e.message };
+        next[aiIdx] = { role: "ai", time: nowTime(), text: replyText, crisis };
+        return next;
+      });
+
+      if (r.outcome === "pending_review" && r.session_id) startPolling(r.session_id, aiIdx);
+    } catch {
+      setMessages((prev) => {
+        const next = [...prev];
+        next[aiIdx] = { role: "ai", time: nowTime(), error: true, text: "Sorry, I couldn't reach the server. Please try again in a moment." };
         return next;
       });
     } finally {
@@ -329,258 +289,80 @@ export default function Chat() {
   function handleKey(e) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      send();
+      sendText();
     }
   }
 
-  const activeTitle = conversations.find((c) => c.id === activeId)?.title;
-
   return (
-    <div className="chat-page">
-      <PageHero
-        title="AI Support"
-        subtitle="Chat with MindCare AI — your 24/7 mental wellness companion."
-        mascot="chat"
-        mascotSize={90}
-      />
-      <div className="chat-shell">
-        <div className="chat-layout">
-          {/* Header bar: current convo + history dropdown + new chat */}
-          <div className="chat-header">
-            <div className="chat-header-title">
-              {activeTitle || "New conversation"}
+    <div className="ai-page">
+      <div className="ai-grid">
+        {/* ── CENTER: chat ── */}
+        <div className="ai-main">
+          {/* Header */}
+          <header className="ai-header">
+            <div className="ai-header-text">
+              <h1 className="ai-title">AI Support</h1>
+              <p className="ai-subtitle">
+                Chat with MindCare AI to share, work through your emotions, and find the right
+                solutions for you.
+              </p>
             </div>
-            <div className="chat-header-actions">
-              <div className="chat-history-wrap">
-                <button className="chat-header-btn" onClick={() => setHistOpen((o) => !o)}>
-                  🕑 History {conversations.length > 0 && <span className="chat-hist-count">{conversations.length}</span>}
-                </button>
-                {histOpen && (
-                  <>
-                    <div className="chat-hist-overlay" onClick={() => setHistOpen(false)} />
-                    <div className="chat-hist-menu">
-                      {conversations.length === 0 && (
-                        <div className="chat-hist-empty">No conversations yet</div>
-                      )}
-                      {conversations.map((c) => (
-                        <div
-                          key={c.id}
-                          className={`chat-hist-item ${c.id === activeId ? "active" : ""}`}
-                          onClick={() => openConversation(c.id)}
-                        >
-                          <span className="chat-hist-item-title">{c.title}</span>
-                          <button
-                            className="chat-hist-del"
-                            title="Delete"
-                            onClick={(e) => { e.stopPropagation(); deleteConversation(c.id); }}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-                      {memory && memory.turn_count > 0 && (
-                        <div className="chat-hist-memory">
-                          🧩 {memory.turn_count} prior turns remembered
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-              <button className="chat-new-btn" onClick={newConversation}>
-                ＋ New chat
-              </button>
-            </div>
-          </div>
+            <div className="ai-header-mascot"><Mascot variant="wave" size={138} /></div>
+          </header>
 
           {/* Topic chips */}
-          <div className="chat-chips">
-            <span className="chat-chips-label">Try asking about:</span>
-            {PROMPT_CHIPS.map((c) => (
-              <button key={c.label} className="chat-chip" onClick={() => useChip(c.text)}>
-                {c.label}
+          <div className="ai-topicbar">
+            <span className="ai-topic-label">You can start with common topics</span>
+            {TOPICS.map((t) => (
+              <button key={t.label} className="ai-chip" onClick={() => sendText(t.text)}>
+                <span className="ai-chip-emoji">{t.emoji}</span>{t.label}
               </button>
             ))}
+            <button className="ai-chip-more" aria-label="More topics"><Icon name="chevron" size={16} /></button>
           </div>
 
-          <div className="chat-feed">
-            {messages.length === 0 && (
-              <div className="chat-empty">
-                <Mascot variant="chat" size={96} />
-                <div className="chat-empty-title">How are you feeling today?</div>
-                <div className="chat-empty-sub">
-                  Share what's on your mind. Your responses go through a safety
-                  check first — a clinician reviews anything sensitive.
-                </div>
-                <div className="chat-empty-prompts">
-                  {[
-                    "I keep overthinking everything and can't sleep",
-                    "I feel like nobody understands what I'm going through",
-                    "I've been avoiding things that make me anxious",
-                  ].map((p) => (
-                    <button
-                      key={p}
-                      className="prompt-chip"
-                      onClick={() => {
-                        setInput(p);
-                        textareaRef.current?.focus();
-                      }}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {messages.map((msg, i) => {
-              if (msg.role === "user") {
-                return (
-                  <div key={i} className="bubble bubble-user">
-                    <div className="bubble-body">{msg.text}</div>
-                  </div>
-                );
-              }
-
-              if (msg.outcome === "loading") return <TypingDots key={i} />;
-
-              if (msg.outcome === "error") {
-                return (
-                  <div key={i} className="bubble bubble-ai">
-                    <div className="bubble-avatar"><Mascot variant="chat" size={34} /></div>
-                    <div className="bubble-body bubble-error">
-                      Something went wrong: {msg.message}
-                    </div>
-                  </div>
-                );
-              }
-
-              if (msg.outcome === "crisis") {
-                return (
-                  <div key={i} className="bubble bubble-ai">
-                    <div className="bubble-avatar">🆘</div>
-                    <div className="bubble-body bubble-crisis">
-                      <TriageBadge level={msg.triage?.triage_level} />
-                      <p style={{ marginTop: 10 }}>{msg.message}</p>
-                      <CrisisResources res={msg.crisisResources} />
-                    </div>
-                  </div>
-                );
-              }
-
-              if (msg.outcome === "pending") {
-                return (
-                  <div key={i} className="bubble bubble-ai">
-                    <div className="bubble-avatar">👨‍⚕️</div>
-                    <div className="bubble-body bubble-pending">
-                      <TriageBadge level={msg.triage?.triage_level} />
-                      <div className="pending-row">
-                        <span className="spinner" />
-                        <span>
-                          {msg.message || "A clinician is reviewing your message…"}
-                        </span>
-                      </div>
-                      {msg.crisisResources && (
-                        <CrisisResources res={msg.crisisResources} />
-                      )}
-                    </div>
-                  </div>
-                );
-              }
-
-              if (msg.outcome === "answered_reviewed") {
-                return (
-                  <div key={i} className="bubble bubble-ai">
-                    <div className="bubble-avatar">👨‍⚕️</div>
-                    <div className="bubble-body">
-                      <div className="reviewed-badge">✓ Clinician reviewed</div>
-                      {msg.technique && (
-                        <div className="technique-tag">{msg.technique}</div>
-                      )}
-                      <p className="response-text">{msg.response}</p>
-                    </div>
-                  </div>
-                );
-              }
-
-              if (msg.outcome === "answered") {
-                return (
-                  <div key={i} className="bubble bubble-ai">
-                    <div className="bubble-avatar"><Mascot variant="chat" size={34} /></div>
-                    <div className="bubble-body">
-                      <TriageBadge level={msg.triage?.triage_level} />
-                      {msg.technique && (
-                        <div className="technique-tag">{msg.technique}</div>
-                      )}
-                      <p className="response-text">{msg.response}</p>
-                      {msg.alternatives?.length > 0 && (
-                        <details className="alt-responses">
-                          <summary>
-                            {msg.alternatives.length} alternative approach
-                            {msg.alternatives.length > 1 ? "es" : ""}
-                          </summary>
-                          {msg.alternatives.map((d, j) => (
-                            <div key={j} className="alt-item">
-                              <span className="technique-tag">{d.technique}</span>
-                              <p>{d.response}</p>
-                            </div>
-                          ))}
-                        </details>
-                      )}
-                    </div>
-                  </div>
-                );
-              }
-
-              if (msg.outcome === "rejected") {
-                return (
-                  <div key={i} className="bubble bubble-ai">
-                    <div className="bubble-avatar">👨‍⚕️</div>
-                    <div className="bubble-body bubble-pending">
-                      <p>{msg.response}</p>
-                    </div>
-                  </div>
-                );
-              }
-
-              return null;
-            })}
-
+          {/* Feed */}
+          <div className="ai-feed">
+            {messages.map((m, i) => (m.typing ? <TypingBubble key={i} /> : <ChatBubble key={i} msg={m} />))}
             <div ref={bottomRef} />
           </div>
 
-          <div className="chat-input-wrap">
-            <div className="chat-input-inner">
-              <textarea
-                ref={textareaRef}
-                className="chat-textarea"
-                rows={2}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder="Share what's on your mind… (Enter to send)"
-                disabled={busy}
-              />
-              <button
-                className="send-btn"
-                onClick={send}
-                disabled={busy || !input.trim()}
-              >
-                {busy ? <span className="spinner" style={{ marginRight: 0 }} /> : "➤"}
+          {/* Quick replies */}
+          <div className="ai-quickreplies">
+            {QUICK_REPLIES.map((q) => (
+              <button key={q.text} className="ai-qr" onClick={() => sendText(q.text)}>
+                <Icon name={q.icon} size={15} className="ai-qr-icon" />{q.text}
               </button>
-            </div>
-            <div className="input-hint">
-              Enter to send · Shift+Enter for new line
-            </div>
+            ))}
+            <button className="ai-qr-refresh" aria-label="Refresh suggestions"><Icon name="refresh" size={16} /></button>
+          </div>
+
+          {/* Input */}
+          <div className="ai-inputbar">
+            <button className="ai-attach" aria-label="Attach file"><Icon name="paperclip" size={19} /></button>
+            <input
+              ref={inputRef}
+              className="ai-input"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKey}
+              placeholder="Message MindCare AI..."
+              disabled={busy}
+            />
+            <button className="ai-send" onClick={() => sendText()} disabled={busy || !input.trim()} aria-label="Send">
+              <Icon name="send" size={18} stroke={2} />
+            </button>
+          </div>
+
+          {/* Disclaimer */}
+          <div className="ai-disclaimer">
+            <Icon name="shield" size={14} />
+            This conversation is private and for support only; it is not a substitute for professional advice.
           </div>
         </div>
 
-        <RightPanel
-          onUseTip={useChip}
-          conversations={conversations}
-          activeId={activeId}
-          onOpenConvo={openConversation}
-        />
+        {/* ── RIGHT: panel ── */}
+        <RightPanel onUseTip={(t) => sendText(t)} />
       </div>
     </div>
   );

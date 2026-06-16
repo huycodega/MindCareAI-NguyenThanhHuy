@@ -8,36 +8,59 @@ so dim/space are guaranteed compatible at retrieval time.
 Both models load lazily on first use to keep cold-start fast.
 """
 import logging
-from typing import List, Tuple, Optional
-
-import torch
-from sentence_transformers import SentenceTransformer, CrossEncoder
+from typing import Any, List, Tuple, Optional
 
 from app.core.config import settings
 
 
 log = logging.getLogger(__name__)
-_device = "cuda" if torch.cuda.is_available() else "cpu"
-_embedder: Optional[SentenceTransformer] = None
-_reranker: Optional[CrossEncoder] = None
+_device: Optional[str] = None
+_embedder: Optional[Any] = None
+_reranker: Optional[Any] = None
 
 
-def get_embedder() -> SentenceTransformer:
+def _ml_runtime():
+    """Load optional ML dependencies only when retrieval actually needs them."""
+    try:
+        import torch
+        from sentence_transformers import SentenceTransformer, CrossEncoder
+    except ImportError as e:
+        raise RuntimeError(
+            "ML retrieval dependencies are not installed. "
+            "Use requirements.txt for full RAG, or run with MOCK_LLM=true "
+            "to allow graceful no-context responses."
+        ) from e
+    return torch, SentenceTransformer, CrossEncoder
+
+
+def _get_device() -> str:
+    global _device
+    if _device is None:
+        torch, _, _ = _ml_runtime()
+        _device = "cuda" if torch.cuda.is_available() else "cpu"
+    return _device
+
+
+def get_embedder():
     global _embedder
     if _embedder is None:
+        _, SentenceTransformer, _ = _ml_runtime()
+        device = _get_device()
         log.info("Loading embedder %s on %s",
-                 settings.embedding_model, _device)
+                 settings.embedding_model, device)
         _embedder = SentenceTransformer(settings.embedding_model,
-                                          device=_device)
+                                          device=device)
     return _embedder
 
 
-def get_reranker() -> CrossEncoder:
+def get_reranker():
     global _reranker
     if _reranker is None:
+        _, _, CrossEncoder = _ml_runtime()
+        device = _get_device()
         log.info("Loading reranker %s on %s",
-                 settings.reranker_model, _device)
-        _reranker = CrossEncoder(settings.reranker_model, device=_device,
+                 settings.reranker_model, device)
+        _reranker = CrossEncoder(settings.reranker_model, device=device,
                                    max_length=512)
     return _reranker
 

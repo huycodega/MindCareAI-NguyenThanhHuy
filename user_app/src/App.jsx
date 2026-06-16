@@ -114,9 +114,9 @@ function Sidebar({ activePage, onNav }) {
 
       {/* Bottom companion card */}
       <div className="sidebar-companion-card">
-        <div className="sidebar-companion-title">You are not alone</div>
+        <div className="sidebar-companion-title">MindCare AI<br />is always by your side</div>
         <div className="sidebar-companion-text">
-          MindCare AI is always here to listen and walk alongside you.
+          You are not alone. We are here to listen and support you anytime.
         </div>
         <div className="sidebar-companion-mascot">
           <Mascot variant="concerned" size={120} />

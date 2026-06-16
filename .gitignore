@@ -23,8 +23,11 @@ env/
 node_modules/
 dist/
 .vite/
+.npm-cache/
+user_app/.npm-cache/
 
 # Docker volumes (không push data)
+data new/
 models/cbt_rag_final/qdrant_storage/
 models/cbt_rag_final/rag_outputs/bm25_rag1.pkl
 models/cbt_rag_final/rag_outputs/bm25_rag2.pkl
@@ -43,6 +46,9 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Claude Code ai-log transient state (the log itself, .claude/ai-log.md, is kept)
+.claude/.ai-log-state
 
 # Alembic (giữ migrations nhưng bỏ cache)
 backend/app/__pycache__/

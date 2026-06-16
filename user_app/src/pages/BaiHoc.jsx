@@ -1,57 +1,109 @@
 import { useState } from "react";
-import MascotCard from "../components/MascotCard.jsx";
-import PageHero from "../components/PageHero.jsx";
 import Mascot from "../components/Mascot.jsx";
 
-const CATEGORIES = ["All", "Anxiety Management", "Positive Thinking", "Mindfulness", "Relaxation", "Relationships"];
+/* ── Filter chips (match mockup) ───────────────────────────────── */
+const FILTERS = [
+  { id: "all",      icon: "▦", label: "All" },
+  { id: "emotion",  icon: "🙂", label: "Emotion Management" },
+  { id: "thinking", icon: "🧠", label: "Thinking" },
+  { id: "mindful",  icon: "🧘", label: "Mindfulness" },
+  { id: "relax",    icon: "🌬️", label: "Relaxation" },
+  { id: "habit",    icon: "🎯", label: "Habit Building" },
+];
 
-const THUMB_GRADIENTS = {
-  "Anxiety Management": "linear-gradient(135deg, #C2EDEB 0%, #7ED4C8 100%)",
-  "Positive Thinking":  "linear-gradient(135deg, #E0D4FC 0%, #BBA3F5 100%)",
-  "Mindfulness":        "linear-gradient(135deg, #C8DFFF 0%, #97BDF8 100%)",
-  "Relaxation":         "linear-gradient(135deg, #C4ECC8 0%, #90CCA0 100%)",
-  "Relationships":      "linear-gradient(135deg, #FFD4E4 0%, #F5A0C0 100%)",
+/* accent → [icon background, accent color] */
+const ACCENTS = {
+  green:  ["#E4F6F1", "#2BA37F"],
+  indigo: ["#E8ECFD", "#4F6BED"],
+  purple: ["#EEE7FC", "#8B5CF6"],
+  teal:   ["#DCF5F1", "#14B8A6"],
+  orange: ["#FDEFD9", "#F59E0B"],
+  pink:   ["#FCE3EE", "#EC4899"],
 };
 
-// image: đặt file PNG vào user_app/public/lessons/ rồi điền đường dẫn "/lessons/tên-file.png"
-const LESSONS = [
-  {
-    id: 1, image: null, icon: "🌊", category: "Anxiety Management",
-    title: "Managing Anxiety Emotions",
-    desc: "Learn about anxiety and how to regulate emotions through CBT",
-    duration: "15 min", chapters: 5, progress: 80, difficulty: "easy",
-  },
-  {
-    id: 2, image: null, icon: "💭", category: "Positive Thinking",
-    title: "Positive Thinking & Optimism",
-    desc: "Techniques for identifying and changing negative thought patterns",
-    duration: "20 min", chapters: 6, progress: 40, difficulty: "medium",
-  },
-  {
-    id: 3, image: null, icon: "🧘", category: "Mindfulness",
-    title: "Basic Mindfulness Techniques",
-    desc: "Practice mindfulness to reduce stress and increase present-moment awareness",
-    duration: "12 min", chapters: 4, progress: 0, difficulty: "easy",
-  },
-  {
-    id: 4, image: null, icon: "😴", category: "Relaxation",
-    title: "5-4-3-2-1 Stress Reduction",
-    desc: "5-sense grounding technique for immediate calm",
-    duration: "8 min", chapters: 3, progress: 100, difficulty: "easy",
-  },
-  {
-    id: 5, image: null, icon: "🎯", category: "Positive Thinking",
-    title: "Identifying Cognitive Distortions",
-    desc: "Learn to spot 10 common cognitive distortions and how to challenge them",
-    duration: "25 min", chapters: 8, progress: 20, difficulty: "hard",
-  },
-  {
-    id: 6, image: null, icon: "❤️", category: "Relationships",
-    title: "Mental Health in Relationships",
-    desc: "Healthy communication, personal boundaries, and mutual support",
-    duration: "18 min", chapters: 5, progress: 0, difficulty: "medium",
-  },
+/* ── Lessons by topic (6 cards) ────────────────────────────────── */
+const TOPICS = [
+  { n: 1, accent: "green",  cat: "emotion",  art: "smiley", title: "Managing Stress",
+    desc: "Understand the causes of stress and learn how to control your own reactions.",
+    time: "20 min", progress: 60 },
+  { n: 2, accent: "indigo", cat: "thinking", art: "brain", title: "Positive Thinking",
+    desc: "Identify negative thoughts and replace them with a more positive perspective.",
+    time: "18 min", progress: 40 },
+  { n: 3, accent: "purple", cat: "mindful",  art: "lotus", title: "Mindfulness Skills",
+    desc: "Practice mindfulness to reduce anxiety and live fully in the present moment.",
+    time: "15 min", progress: 20 },
+  { n: 4, accent: "teal",   cat: "relax",    art: "wind", title: "4-7-8 Breathing",
+    desc: "A simple breathing technique to relax the body and calm the mind quickly.",
+    time: "10 min", progress: 0 },
+  { n: 5, accent: "orange", cat: "thinking", art: "cloud", title: "Spotting Cognitive Distortions",
+    desc: "Learn to recognize and adjust common distorted thinking patterns.",
+    time: "22 min", progress: 0 },
+  { n: 6, accent: "pink",   cat: "habit",    art: "target", title: "Setting Realistic Goals",
+    desc: "Set SMART goals and build an effective action plan.",
+    time: "16 min", progress: 0 },
 ];
+
+/* ── Topic icons (flat illustrations matching the mockup) ──────── */
+function TopicArt({ type, color }) {
+  switch (type) {
+    case "smiley": // green smiley face
+      return (
+        <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" fill={color} />
+          <circle cx="9" cy="10.3" r="1.25" fill="#fff" />
+          <circle cx="15" cy="10.3" r="1.25" fill="#fff" />
+          <path d="M8.4 14c.9 1.2 2.1 1.9 3.6 1.9s2.7-.7 3.6-1.9" stroke="#fff" strokeWidth="1.7" fill="none" strokeLinecap="round" />
+        </svg>
+      );
+    case "brain": // head profile with brain
+      return (
+        <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+          <path d="M9 16.5H7.4l.7-2.3A6.4 6.4 0 1 1 14 18.4v1.1a1 1 0 0 1-1 1h-3a1 1 0 0 1-1-1z" fill={color} />
+          <path d="M10.4 7.6a1.5 1.5 0 0 1 2.8-.5 1.4 1.4 0 0 1 .9 2.3 1.3 1.3 0 0 1-1 2.1h-2.5a1.3 1.3 0 0 1-1-2.1 1.5 1.5 0 0 1 .8-1.8z" fill="#fff" opacity="0.9" />
+          <path d="M12 7.4v4.2" stroke={color} strokeWidth="0.9" />
+        </svg>
+      );
+    case "lotus": // layered lotus flower
+      return (
+        <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill={color}>
+          <path d="M4 11.2c2 .1 3.8 1 5.1 2.5 1 1.1 1.6 2.4 1.7 3.8H10c-2.5 0-4.6-.9-5.6-2.8-.4-1-.5-2.3-.4-3.5z" opacity="0.5" />
+          <path d="M20 11.2c-2 .1-3.8 1-5.1 2.5-1 1.1-1.6 2.4-1.7 3.8H14c2.5 0 4.6-.9 5.6-2.8.4-1 .5-2.3.4-3.5z" opacity="0.5" />
+          <path d="M7 7.2c1.9.6 3.4 1.9 4.2 3.6.6 1.3.9 2.6.7 4-1.4-.2-2.7-.9-3.6-2C7 14.9 6.5 12.8 7 7.2z" opacity="0.72" />
+          <path d="M17 7.2c-1.9.6-3.4 1.9-4.2 3.6-.6 1.3-.9 2.6-.7 4 1.4-.2 2.7-.9 3.6-2 1.3-1.9 1.8-4 1.3-5.6z" opacity="0.72" />
+          <path d="M12 3.2c1.9 2.1 2.9 4.3 2.9 6.6 0 1.5-.4 2.9-1.1 4.1h-3.6C9.4 12.7 9 11.3 9 9.8c0-2.3 1-4.5 3-6.6z" />
+        </svg>
+      );
+    case "wind": // breeze lines
+      return (
+        <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke={color} strokeWidth="1.9" strokeLinecap="round">
+          <path d="M3 8.5h8.5A2.5 2.5 0 1 0 9 6" />
+          <path d="M3 12.5h12A2.5 2.5 0 1 1 12.5 15" />
+          <path d="M3 16.5h6.5A2 2 0 1 1 7.5 18.5" />
+        </svg>
+      );
+    case "cloud": // fluffy thought cloud with face
+      return (
+        <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true">
+          <path d="M7.5 18.5a4 4 0 0 1-1.1-7.85 5 5 0 0 1 9.5-1.65 3.8 3.8 0 0 1 1.1 7.5z" fill={color} />
+          <circle cx="10" cy="13" r="0.95" fill="#fff" />
+          <circle cx="14" cy="13" r="0.95" fill="#fff" />
+          <path d="M10 15.2c.55.6 1.25.9 2 .9s1.45-.3 2-.9" stroke="#fff" strokeWidth="1.3" fill="none" strokeLinecap="round" />
+        </svg>
+      );
+    case "target": // target with arrow
+      return (
+        <svg viewBox="0 0 24 24" width="30" height="30" aria-hidden="true" fill="none" stroke={color} strokeWidth="1.8">
+          <circle cx="10.5" cy="13.5" r="7.5" />
+          <circle cx="10.5" cy="13.5" r="4" />
+          <circle cx="10.5" cy="13.5" r="1.1" fill={color} stroke="none" />
+          <path d="M10.5 13.5l8-8" strokeLinecap="round" />
+          <path d="M15 4.5h4.5V9" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
 
 const STREAK_DAYS = [
   { label: "Mon", done: true },
@@ -59,266 +111,191 @@ const STREAK_DAYS = [
   { label: "Wed", done: true },
   { label: "Thu", done: true },
   { label: "Fri", done: true },
-  { label: "Sat", done: false, today: true },
+  { label: "Sat", done: true },
   { label: "Sun", done: false },
 ];
 
-const SUGGESTED = [
-  { icon: "🌿", title: "4-7-8 Breathing to Relax",     time: "5 min" },
-  { icon: "📓", title: "Daily Emotion Journal",         time: "10 min" },
-  { icon: "🧩", title: "Thought Reframing Exercise",    time: "15 min" },
+const TOOLS = [
+  { icon: "✏️",  title: "Emotion Journal",      sub: "Record your feelings every day" },
+  { icon: "📋",  title: "Practice Exercises",   sub: "CBT exercises & worksheets" },
+  { icon: "✳️",  title: "Positive Reminders",   sub: "Reminders & positive affirmations" },
 ];
 
-function DiffBadge({ level }) {
-  const map = {
-    easy:   ["Beginner",     "diff-easy"],
-    medium: ["Intermediate", "diff-medium"],
-    hard:   ["Advanced",     "diff-hard"],
-  };
-  const [label, cls] = map[level] || ["—", "diff-easy"];
-  return <span className={`difficulty-badge ${cls}`}>{label}</span>;
+/* Soft mountain-journey illustration for the featured card */
+function JourneyArt() {
+  return (
+    <svg className="bh-featured-art" viewBox="0 0 200 150" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="bhSky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#DBF3FF" />
+          <stop offset="1" stopColor="#EAFBF4" />
+        </linearGradient>
+        <linearGradient id="bhHill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#7FD4B0" />
+          <stop offset="1" stopColor="#4FB58D" />
+        </linearGradient>
+      </defs>
+      <rect width="200" height="150" rx="14" fill="url(#bhSky)" />
+      <circle cx="150" cy="34" r="16" fill="#FCD96B" />
+      <path d="M0 150 L52 70 L96 112 L150 52 L200 110 L200 150 Z" fill="url(#bhHill)" />
+      <path d="M52 70 L66 86 L52 92 L62 100 L52 110" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" opacity="0.85" />
+      <path d="M150 52 L150 34 L166 40 L150 46" fill="#EF6F6F" />
+      <line x1="150" y1="52" x2="150" y2="34" stroke="#3D7A63" strokeWidth="2.5" strokeLinecap="round" />
+      <path d="M86 150 C86 132 100 124 100 124 C100 124 114 132 114 150 Z" fill="#3F9E78" />
+      <path d="M30 150 C30 138 40 132 40 132 C40 132 50 138 50 150 Z" fill="#46AB82" />
+    </svg>
+  );
 }
 
 export default function BaiHoc() {
-  const [activeCategory, setActiveCategory] = useState("All");
-  const [openLesson, setOpenLesson] = useState(null);
+  const [active, setActive] = useState("all");
 
-  const filtered = activeCategory === "All"
-    ? LESSONS
-    : LESSONS.filter((l) => l.category === activeCategory);
-
-  if (openLesson) {
-    const lesson = LESSONS.find((l) => l.id === openLesson);
-    return (
-      <div style={{ maxWidth: 720, margin: "0 auto" }}>
-        <button className="btn btn-ghost btn-sm" style={{ marginBottom: 16 }} onClick={() => setOpenLesson(null)}>
-          ← Back to list
-        </button>
-        <div className="card card-lg">
-          <div style={{ fontSize: 48, marginBottom: 16 }}>{lesson.icon}</div>
-          <div className="eyebrow">{lesson.category}</div>
-          <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 8 }}>{lesson.title}</h1>
-          <p style={{ color: "var(--ink-soft)", marginBottom: 20 }}>{lesson.desc}</p>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
-            <span className="badge badge-gray">⏱ {lesson.duration}</span>
-            <span className="badge badge-gray">📚 {lesson.chapters} chapters</span>
-            <DiffBadge level={lesson.difficulty} />
-          </div>
-          {lesson.progress > 0 && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--ink-soft)", marginBottom: 6 }}>
-                <span>Progress</span><span>{lesson.progress}%</span>
-              </div>
-              <div className="progress-bar">
-                <div className="progress-fill" style={{ width: `${lesson.progress}%` }} />
-              </div>
-            </div>
-          )}
-          <div className="divider" />
-          <div style={{ marginBottom: 20 }}>
-            <div className="section-title" style={{ marginBottom: 12 }}>Lesson Content</div>
-            {Array.from({ length: lesson.chapters }, (_, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderBottom: "1px solid var(--line)" }}>
-                <div style={{ width: 28, height: 28, borderRadius: "50%", background: i * (100 / lesson.chapters) < lesson.progress ? "var(--primary)" : "var(--line)", color: i * (100 / lesson.chapters) < lesson.progress ? "#fff" : "var(--ink-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>
-                  {i * (100 / lesson.chapters) < lesson.progress ? "✓" : i + 1}
-                </div>
-                <div style={{ fontSize: 14, color: "var(--ink)" }}>Chapter {i + 1}</div>
-              </div>
-            ))}
-          </div>
-          <button className="btn btn-primary btn-lg btn-full">
-            {lesson.progress === 0 ? "Start lesson" : lesson.progress === 100 ? "Review again" : "Continue lesson"}
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const filtered = active === "all" ? TOPICS : TOPICS.filter((t) => t.cat === active);
 
   return (
-    <>
-      <PageHero
-        title="CBT Lessons & Exercises"
-        subtitle="Learn practical cognitive behavioral therapy skills through short lessons and guided exercises you can apply every day."
-        mascot="reading"
-      />
-
-      <div className="lessons-layout">
-        {/* ── LEFT COLUMN ── */}
-        <div className="lessons-left">
-
-          {/* 1. Filter tabs — ABOVE featured card (matches mockup) */}
-          <div className="filter-tabs" style={{ marginBottom: 16 }}>
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat}
-                className={`filter-tab ${activeCategory === cat ? "active" : ""}`}
-                onClick={() => setActiveCategory(cat)}
-              >
-                {cat}
-              </button>
-            ))}
+    <div className="bh-layout">
+      {/* ── LEFT COLUMN ───────────────────────────────────────── */}
+      <div className="bh-main">
+        {/* Header */}
+        <header className="bh-header">
+          <div className="bh-header-text">
+            <h1 className="bh-title">CBT Lessons &amp; Exercises</h1>
+            <p className="bh-subtitle">
+              Learn and practice CBT techniques to understand yourself better, manage your
+              emotions, and build a positive life every day.
+            </p>
           </div>
-
-          {/* 2. Featured journey card */}
-          <div className="featured-lesson">
-            <div className="featured-inner">
-              <div className="featured-left">
-                <div className="featured-badge">🌟 7-Day Journey</div>
-                <div className="featured-title">Mindful Living</div>
-                <div className="featured-stats-row">
-                  <span className="featured-stat">📚 14 lessons</span>
-                  <span className="featured-stat-sep">·</span>
-                  <span className="featured-stat">⏱ 7 days</span>
-                  <span className="featured-stat-sep">·</span>
-                  <span className="featured-stat">⭐ Beginner</span>
-                </div>
-                <div className="featured-progress-wrap">
-                  <div className="featured-progress">
-                    <div className="featured-progress-fill" style={{ width: "71%" }} />
-                  </div>
-                  <div className="featured-progress-label">5/7 days completed</div>
-                </div>
-                <button className="featured-btn" onClick={() => setOpenLesson(1)}>
-                  Continue →
-                </button>
-              </div>
-              <div className="featured-right">
-                <Mascot variant="reading" size={148} />
-              </div>
-            </div>
+          <div className="bh-header-mascot">
+            <Mascot variant="reading" size={150} />
           </div>
+        </header>
 
-          {/* 3. Section heading */}
-          <div className="lessons-section-header">
-            <div className="lessons-section-title">Lessons by Topic</div>
-            <span className="lessons-section-count">{filtered.length} lessons</span>
-          </div>
-
-          {/* 4. Lesson cards grid */}
-          <div className="lessons-grid">
-            {filtered.map((lesson) => (
-              <div
-                key={lesson.id}
-                className="lesson-card"
-                onClick={() => setOpenLesson(lesson.id)}
-              >
-                {/* Colored thumbnail header */}
-                <div
-                  className="lesson-card-thumb"
-                  style={{ background: THUMB_GRADIENTS[lesson.category] || "var(--primary-soft)" }}
-                >
-                  {lesson.image ? (
-                    <img src={lesson.image} alt={lesson.title} className="lesson-card-img" />
-                  ) : (
-                    <span className="lesson-card-thumb-icon">{lesson.icon}</span>
-                  )}
-                  {lesson.progress === 100 && (
-                    <span className="lesson-thumb-done">✓ Done</span>
-                  )}
-                </div>
-
-                {/* Card body */}
-                <div className="lesson-card-body">
-                  <span className="lesson-cat-badge">{lesson.category}</span>
-                  <div className="lesson-card-title">{lesson.title}</div>
-                  <div className="lesson-card-meta">
-                    <span>⏱ {lesson.duration}</span>
-                    <span>📚 {lesson.chapters} ch.</span>
-                    <DiffBadge level={lesson.difficulty} />
-                  </div>
-
-                  {lesson.progress > 0 && lesson.progress < 100 && (
-                    <div className="lesson-progress">
-                      <div className="lesson-progress-label">
-                        <span>Progress</span>
-                        <span>{lesson.progress}%</span>
-                      </div>
-                      <div className="progress-bar">
-                        <div className="progress-fill" style={{ width: `${lesson.progress}%` }} />
-                      </div>
-                    </div>
-                  )}
-
-                  <button className="lesson-card-btn">
-                    {lesson.progress === 0
-                      ? "Start"
-                      : lesson.progress === 100
-                      ? "Review again"
-                      : "Continue →"}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* 5. View all link */}
-          <div style={{ textAlign: "center", marginTop: 20 }}>
-            <button className="btn btn-ghost" style={{ fontSize: 13 }}>
-              View all lessons ↓
+        {/* Filter chips */}
+        <div className="bh-filters">
+          {FILTERS.map((f) => (
+            <button
+              key={f.id}
+              className={`bh-chip ${active === f.id ? "active" : ""}`}
+              onClick={() => setActive(f.id)}
+            >
+              <span className="bh-chip-icon">{f.icon}</span>
+              {f.label}
             </button>
-          </div>
+          ))}
         </div>
 
-        {/* ── RIGHT COLUMN ── */}
-        <div className="lessons-right">
-          <MascotCard
-            variant="reading"
-            title="Today's Suggestion 💡"
-            text="Try the 'Identifying Negative Thoughts' lesson — just 15 minutes to start changing your mindset!"
-            size={72}
-          />
-
-          <div className="card">
-            <div className="streak-widget">
-              <div className="streak-header">
-                <div>
-                  <div className="streak-number">5 🔥</div>
-                  <div className="streak-label">Day learning streak</div>
-                </div>
-              </div>
-              <div style={{ fontSize: 12, color: "var(--ink-soft)", marginBottom: 10, fontWeight: 500 }}>This week</div>
-              <div className="streak-days">
-                {STREAK_DAYS.map((d, i) => (
-                  <div key={i} className={`streak-day ${d.done ? "done" : d.today ? "today" : "empty"}`}>
-                    {d.done ? "✓" : d.label}
-                  </div>
-                ))}
-              </div>
+        {/* Featured journey card */}
+        <section className="bh-featured">
+          <div className="bh-featured-thumb">
+            <JourneyArt />
+            <span className="bh-featured-badge">⭐ Featured Lesson</span>
+          </div>
+          <div className="bh-featured-body">
+            <h2 className="bh-featured-title">7-Day Journey – Know Yourself, Live Positively</h2>
+            <p className="bh-featured-desc">
+              A 7-day path that helps you better understand your emotions and thoughts,
+              and build positive habits every day.
+            </p>
+            <div className="bh-featured-stats">
+              <span className="bh-fstat">🕐 7 lessons</span>
+              <span className="bh-fstat">📊 For everyone</span>
+              <span className="bh-fstat">👥 12.4k learners</span>
             </div>
           </div>
-
-          <div className="card">
-            <div className="section-title" style={{ marginBottom: 12 }}>📊 Overall Progress</div>
-            {[
-              { label: "Completed",   value: 1, total: 6, color: "var(--success)" },
-              { label: "In progress", value: 3, total: 6, color: "var(--primary)" },
-              { label: "Not started", value: 2, total: 6, color: "var(--ink-soft)" },
-            ].map((s) => (
-              <div key={s.label} style={{ marginBottom: 14 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--ink-soft)", marginBottom: 5 }}>
-                  <span>{s.label}</span><span style={{ fontWeight: 600, color: s.color }}>{s.value}/{s.total}</span>
-                </div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${(s.value / s.total) * 100}%` }} />
-                </div>
-              </div>
-            ))}
+          <div className="bh-featured-action">
+            <button className="bh-btn-primary">Start learning →</button>
           </div>
+        </section>
 
-          <div className="card">
-            <div className="section-title" style={{ marginBottom: 12 }}>✨ Suggested for You</div>
-            {SUGGESTED.map((s, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: i < SUGGESTED.length - 1 ? "1px solid var(--line)" : "none", cursor: "pointer" }}>
-                <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--primary-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{s.icon}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>{s.title}</div>
-                  <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>⏱ {s.time}</div>
+        {/* Topic section */}
+        <h3 className="bh-section-title">Lessons by Topic</h3>
+
+        <div className="bh-grid">
+          {filtered.map((t) => {
+            const [soft, color] = ACCENTS[t.accent];
+            return (
+              <article key={t.n} className="bh-card" style={{ "--accent": color, "--accent-soft": soft }}>
+                <div className="bh-card-icon"><TopicArt type={t.art} color={color} /></div>
+                <div className="bh-card-name">{t.n}. {t.title}</div>
+                <p className="bh-card-desc">{t.desc}</p>
+                <div className="bh-card-meta">
+                  <span>🕐 {t.time}</span>
+                  <span className="bh-card-pct">{t.progress}%</span>
                 </div>
-              </div>
-            ))}
-          </div>
+                <div className="bh-progress">
+                  <div className="bh-progress-fill" style={{ width: `${t.progress}%` }} />
+                </div>
+                <button className="bh-card-btn">
+                  {t.progress > 0 ? "Continue" : "Start"} <span>→</span>
+                </button>
+              </article>
+            );
+          })}
         </div>
+
+        {/* View all */}
+        <button className="bh-viewall">View all lessons ⌄</button>
+
+        {/* Footer disclaimer */}
+        <p className="bh-disclaimer">
+          🛡️ MindCare AI is not a substitute for medical diagnosis. If you need urgent help,
+          please contact your nearest healthcare facility.
+        </p>
       </div>
-    </>
+
+      {/* ── RIGHT COLUMN ──────────────────────────────────────── */}
+      <aside className="bh-side">
+        {/* Suggestion card */}
+        <div className="bh-suggest">
+          <div className="bh-suggest-head">
+            <div className="bh-suggest-title">Suggested for you</div>
+            <Mascot variant="reading" size={84} />
+          </div>
+          <div className="bh-suggest-label">Next lesson</div>
+          <div className="bh-suggest-lesson">4-7-8 Breathing</div>
+          <p className="bh-suggest-desc">
+            A breathing technique that helps you relax and reduce stress right now.
+          </p>
+          <div className="bh-suggest-meta">
+            <span>🕐 10 min</span>
+            <span>📊 Easy</span>
+          </div>
+          <button className="bh-btn-primary bh-btn-full">Start now →</button>
+        </div>
+
+        {/* Streak card */}
+        <div className="bh-panel">
+          <div className="bh-panel-title">Your learning streak</div>
+          <div className="bh-streak-count">🔥 <strong>7 days in a row</strong></div>
+          <div className="bh-streak-days">
+            {STREAK_DAYS.map((d, i) => (
+              <div key={i} className="bh-streak-day">
+                <div className={`bh-streak-dot ${d.done ? "done" : ""}`}>{d.done ? "✓" : ""}</div>
+                <span className="bh-streak-lbl">{d.label}</span>
+              </div>
+            ))}
+          </div>
+          <p className="bh-streak-note">
+            Keep your streak going to build positive habits!
+          </p>
+          <button className="bh-link">View learning history →</button>
+        </div>
+
+        {/* Tools card */}
+        <div className="bh-panel">
+          <div className="bh-panel-title">Learning support tools</div>
+          {TOOLS.map((tool, i) => (
+            <button key={i} className="bh-tool">
+              <div className="bh-tool-icon">{tool.icon}</div>
+              <div className="bh-tool-text">
+                <div className="bh-tool-title">{tool.title}</div>
+                <div className="bh-tool-sub">{tool.sub}</div>
+              </div>
+              <span className="bh-tool-arrow">›</span>
+            </button>
+          ))}
+        </div>
+      </aside>
+    </div>
   );
 }
