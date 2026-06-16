@@ -4822,3 +4822,606 @@ h1.title { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin-bo
 .resource-v2-thumb.hotline.image-icon::after {
   display: none;
 }
+
+/* Home dashboard redesign v3 */
+.home-dashboard-v3 {
+  max-width: 1180px;
+  margin: 0 auto;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  color: #15223a;
+}
+.home-dashboard-v3 .dash-main,
+.home-side-v3 {
+  gap: 18px;
+}
+.home-hero-v3 {
+  min-height: 286px;
+  padding: 34px 38px;
+  border: 1px solid #d9eee8;
+  border-radius: 24px;
+  background: linear-gradient(120deg, #ecfbf5 0%, #f7fbff 62%, #f4f2ff 100%);
+  box-shadow: 0 18px 44px rgba(31, 100, 86, 0.08);
+}
+.home-hero-v3::before,
+.home-hero-v3::after {
+  display: none;
+}
+.home-hero-kicker {
+  display: inline-flex;
+  width: fit-content;
+  margin-bottom: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(43, 182, 115, 0.2);
+  background: rgba(255, 255, 255, 0.7);
+  color: #16866f;
+  font-size: 12px;
+  font-weight: 800;
+}
+.home-dashboard-v3 .hero-title {
+  max-width: 590px;
+  margin-bottom: 14px;
+  color: #101b35;
+  font-size: 34px;
+  line-height: 1.18;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+.home-dashboard-v3 .hero-sub {
+  max-width: 540px;
+  margin-bottom: 24px;
+  color: #66758c;
+  font-size: 15px;
+  line-height: 1.7;
+}
+.home-dashboard-v3 .btn-hero-primary,
+.home-dashboard-v3 .btn-hero-ghost {
+  min-height: 44px;
+  border-radius: 13px;
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 850;
+}
+.home-dashboard-v3 .btn-hero-primary {
+  border: none;
+  background: linear-gradient(135deg, #0f9b86, #2bb673);
+  color: #fff;
+  box-shadow: 0 12px 24px rgba(43, 182, 115, 0.22);
+}
+.home-dashboard-v3 .btn-hero-ghost {
+  border: 1px solid #cfe5df;
+  background: rgba(255, 255, 255, 0.82);
+  color: #0e7768;
+}
+.home-hero-mascot-card {
+  width: 270px;
+  min-height: 210px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.65);
+}
+.home-section-card,
+.home-chat-card,
+.home-lessons-card,
+.home-side-card,
+.home-motivation-card {
+  border: 1px solid #e1ece9;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 30px rgba(24, 83, 72, 0.06), 0 1px 3px rgba(24, 83, 72, 0.04);
+}
+.home-dashboard-v3 .block {
+  padding: 22px;
+}
+.home-dashboard-v3 .block-title,
+.home-dashboard-v3 .side-title {
+  color: #14213b;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+.home-dashboard-v3 .block-head {
+  margin-bottom: 16px;
+}
+.home-feature-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.home-feature-card {
+  min-height: 184px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid #e2ece9;
+  background: linear-gradient(180deg, #fff 0%, #fbfefd 100%);
+  box-shadow: none;
+  text-align: left;
+}
+.home-feature-card:hover {
+  border-color: #b9dfd7;
+  box-shadow: 0 16px 28px rgba(24, 83, 72, 0.08);
+  transform: translateY(-2px);
+}
+.home-feature-card .feature-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  margin-bottom: 10px;
+  background: #e6f8f1;
+  color: #0f9b86;
+  font-size: 22px;
+}
+.home-feature-card .feature-title {
+  color: #15223a;
+  font-size: 15px;
+  font-weight: 900;
+}
+.home-feature-card .feature-desc {
+  color: #65748b;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.home-feature-card .feature-link {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 8px;
+  color: #0f8f78;
+  font-size: 12.5px;
+  font-weight: 850;
+}
+.home-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.home-step-card {
+  padding: 16px;
+  border: 1px solid #e2ece9;
+  border-radius: 16px;
+  background: #fbfefd;
+  align-items: flex-start;
+}
+.home-step-card .step-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  margin-bottom: 12px;
+  background: #e6f8f1;
+  color: #0f9b86;
+}
+.home-step-card .step-num {
+  right: -5px;
+  top: -5px;
+  background: #0f9b86;
+  color: #fff;
+}
+.home-step-card .step-title {
+  color: #15223a;
+  font-size: 14px;
+  font-weight: 900;
+}
+.home-step-card .step-desc {
+  color: #66758c;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.home-bottom-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+  gap: 18px;
+}
+.home-chat-card .chat-preview-bubble {
+  border-radius: 6px 16px 16px 16px;
+  background: #f0faf6;
+  color: #405069;
+}
+.home-chat-card .chat-preview-input {
+  border-color: #dce8e5;
+  background: #fff;
+}
+.home-chat-card .chat-preview-send {
+  background: #0f9b86;
+}
+.home-lessons-card .featured-item {
+  border-radius: 14px;
+}
+.home-lessons-card .featured-title {
+  color: #15223a;
+  font-weight: 850;
+}
+.home-side-v3 {
+  position: sticky;
+  top: 0;
+}
+.home-side-card {
+  padding: 20px;
+}
+.home-side-card .side-head {
+  margin-bottom: 14px;
+}
+.result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid #edf3f1;
+  color: #65748b;
+  font-size: 13px;
+}
+.result-row strong {
+  color: #15223a;
+  font-weight: 850;
+}
+.latest-result-card .side-text {
+  margin: 14px 0 16px;
+}
+.home-dashboard-v3 .risk-pill {
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 850;
+}
+.home-dashboard-v3 .btn-outline-full {
+  min-height: 40px;
+  border-radius: 12px;
+  border: 1px solid #d5e6e1;
+  color: #0f8f78;
+  font-weight: 850;
+}
+.home-dashboard-v3 .suggest-card {
+  background: linear-gradient(135deg, #f0fbf7 0%, #fff 100%);
+}
+.home-dashboard-v3 .btn-primary-sm {
+  border-radius: 11px;
+  background: #0f9b86;
+}
+.home-motivation-card {
+  padding: 18px;
+  background: linear-gradient(135deg, #eaf8f5 0%, #ffffff 100%);
+}
+.home-motivation-card .encourage-title {
+  color: #0f8f78;
+  font-weight: 900;
+}
+.home-motivation-card .encourage-text,
+.home-side-card .side-text {
+  color: #66758c;
+}
+.home-side-card .activity-row {
+  align-items: flex-start;
+  padding: 12px 0;
+}
+.home-side-card .activity-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+}
+.home-side-card .activity-text {
+  color: #15223a;
+  font-size: 13px;
+  font-weight: 850;
+}
+.home-side-card .activity-status {
+  margin-top: 4px;
+  font-size: 11.5px;
+  font-weight: 800;
+}
+
+@media (max-width: 1180px) {
+  .home-dashboard-v3 {
+    grid-template-columns: 1fr;
+  }
+  .home-side-v3 {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
+  .home-hero-v3 {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .home-hero-mascot-card {
+    order: -1;
+    width: 100%;
+  }
+  .home-feature-grid,
+  .home-steps-grid,
+  .home-bottom-grid,
+  .home-side-v3 {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .home-dashboard-v3 {
+    max-width: none;
+  }
+  .home-hero-v3,
+  .home-dashboard-v3 .block,
+  .home-side-card,
+  .home-motivation-card {
+    border-radius: 16px;
+    padding: 18px;
+  }
+  .home-dashboard-v3 .hero-title {
+    font-size: 25px;
+  }
+  .home-dashboard-v3 .hero-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  .home-dashboard-v3 .btn-hero-primary,
+  .home-dashboard-v3 .btn-hero-ghost {
+    justify-content: center;
+    width: 100%;
+  }
+}
+
+/* Sidebar icon polish to match the home demo */
+.nav-icon,
+.topbar-tab-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", var(--font);
+  font-size: 19px;
+  line-height: 1;
+}
+.topbar-tab-icon {
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  font-size: 16px;
+}
+
+/* Sidebar SVG line icons matching the demo */
+.nav-icon,
+.topbar-tab-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  color: #34466f;
+  line-height: 1;
+}
+.nav-svg-icon {
+  display: block;
+  width: 22px;
+  height: 22px;
+  color: currentColor;
+}
+.nav-item.active .nav-icon,
+.nav-item:hover .nav-icon {
+  color: var(--primary-dark);
+}
+.topbar-tab-icon {
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+}
+.topbar-tab-icon .nav-svg-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Home sections tuned to match the reference dashboard */
+.home-dashboard-v3 .home-section-card {
+  padding: 18px 20px 20px;
+}
+.home-dashboard-v3 .home-section-card .block-head {
+  margin-bottom: 12px;
+}
+.home-dashboard-v3 .home-section-card .block-title,
+.home-dashboard-v3 .home-lessons-card .block-title,
+.home-dashboard-v3 .home-chat-card .block-title {
+  font-size: 16px;
+  line-height: 1.25;
+  color: #102044;
+}
+.home-dashboard-v3 .home-feature-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+}
+.home-dashboard-v3 .home-feature-card {
+  min-height: 168px;
+  padding: 16px 12px 14px;
+  align-items: center;
+  text-align: center;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(21, 73, 65, 0.035);
+}
+.home-dashboard-v3 .home-feature-card .feature-icon {
+  width: 50px;
+  height: 50px;
+  margin: 0 auto 10px;
+  border-radius: 14px;
+  background: #eef9f6;
+  color: #0d8f7a;
+}
+.home-dashboard-v3 .home-feature-card .feature-title {
+  width: 100%;
+  margin-bottom: 7px;
+  font-size: 13px;
+  color: #102044;
+}
+.home-dashboard-v3 .home-feature-card .feature-desc {
+  width: 100%;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: #586a86;
+}
+.home-dashboard-v3 .home-feature-card .feature-link {
+  margin: 10px auto 0;
+  font-size: 11.5px;
+}
+.home-dashboard-v3 .home-feature-card .feature-link::after {
+  content: "›";
+  margin-left: 5px;
+  font-size: 15px;
+  line-height: 1;
+}
+.home-dashboard-v3 .home-steps-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  align-items: stretch;
+}
+.home-dashboard-v3 .home-step-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px 22px 14px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+.home-dashboard-v3 .home-step-card:not(:last-child)::after {
+  content: "→";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #8aa1bd;
+  font-size: 20px;
+  font-weight: 700;
+}
+.home-dashboard-v3 .home-step-card .step-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0;
+  border-radius: 50%;
+  border: 1px solid #cdece4;
+  background: #eaf8f4;
+  color: #0d8f7a;
+  font-size: 20px;
+}
+.home-dashboard-v3 .home-step-card .step-num {
+  right: -2px;
+  top: -3px;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+}
+.home-dashboard-v3 .home-step-card .step-title {
+  margin-bottom: 4px;
+  font-size: 12.5px;
+  color: #102044;
+}
+.home-dashboard-v3 .home-step-card .step-title::before {
+  content: attr(data-step);
+}
+.home-dashboard-v3 .home-step-card .step-desc {
+  font-size: 11px;
+  line-height: 1.45;
+  color: #52647f;
+}
+.home-dashboard-v3 .home-bottom-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(350px, 0.94fr);
+  gap: 18px;
+}
+.home-dashboard-v3 .home-chat-card,
+.home-dashboard-v3 .home-lessons-card {
+  padding: 18px;
+}
+.home-dashboard-v3 .home-lessons-card .featured-list {
+  gap: 2px;
+}
+.home-dashboard-v3 .home-lessons-card .featured-item {
+  min-height: 56px;
+  padding: 8px 0;
+  border: none;
+  border-bottom: 1px solid #edf3f1;
+  border-radius: 0;
+  background: transparent;
+}
+.home-dashboard-v3 .home-lessons-card .featured-item:last-child {
+  border-bottom: none;
+}
+.home-dashboard-v3 .home-lessons-card .featured-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  font-size: 18px;
+}
+.home-dashboard-v3 .home-lessons-card .featured-title {
+  font-size: 13px;
+  font-weight: 850;
+  color: #102044;
+}
+.home-dashboard-v3 .home-lessons-card .featured-meta {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #687992;
+}
+.home-dashboard-v3 .home-lessons-card .featured-arrow {
+  color: #243b6b;
+  font-size: 20px;
+}
+
+@media (max-width: 1180px) {
+  .home-dashboard-v3 .home-feature-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .home-dashboard-v3 .home-steps-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .home-dashboard-v3 .home-step-card {
+    padding-right: 0;
+  }
+  .home-dashboard-v3 .home-step-card::after {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .home-dashboard-v3 .home-feature-grid,
+  .home-dashboard-v3 .home-steps-grid {
+    grid-template-columns: 1fr;
+  }
+  .home-dashboard-v3 .home-feature-card {
+    min-height: 0;
+    align-items: flex-start;
+    text-align: left;
+  }
+  .home-dashboard-v3 .home-feature-card .feature-icon,
+  .home-dashboard-v3 .home-feature-card .feature-link {
+    margin-left: 0;
+    margin-right: 0;
+  }
+}
+
+/* Main Features line icons synced with sidebar demo */
+.home-dashboard-v3 .home-feature-card .feature-icon {
+  color: #34466f;
+  background: #f1fbf8;
+  border: 1px solid #d8eee8;
+}
+.home-dashboard-v3 .home-feature-card:hover .feature-icon {
+  color: #0f9b86;
+  background: #e2f6f1;
+  border-color: #b9dfd7;
+}
+.home-dashboard-v3 .home-feature-card .feature-icon svg {
+  display: block;
+  width: 28px;
+  height: 28px;
+}
+
+/* Activity History SVG icons */
+.home-side-card .activity-icon {
+  color: #34466f;
+}
+.home-side-card .activity-icon svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
