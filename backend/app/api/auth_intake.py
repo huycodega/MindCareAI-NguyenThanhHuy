@@ -173,6 +173,9 @@ def login(body: LoginIn, request: Request, db: Session = Depends(get_db)):
               .first())
     if not user or not auth.verify_password(body.password, user.password_hash):
         raise HTTPException(401, "Invalid username or password")
+    if getattr(user, "status", "active") == "suspended":
+        raise HTTPException(
+            403, "This account has been suspended. Please contact support.")
     if not user.email_verified:
         raise HTTPException(
             403, "Email not verified — check your inbox for the code")

@@ -25,33 +25,28 @@ export default function Login({ onAuth }) {
   return (
     <div className="login-wrap">
       <div className="login-card">
-        <div className="login-logo">👨‍⚕️</div>
-        <div className="login-title">Clinician Dashboard</div>
+        <div className="login-logo">
+          <div className="admin-logo-icon">🌿</div>
+          <div className="admin-logo-text" style={{ color: "var(--ink)" }}>
+            MindCare AI<small style={{ color: "var(--ink-faint)" }}>Admin console</small>
+          </div>
+        </div>
+        <div className="login-title">Welcome back</div>
         <p className="login-sub">
-          Review AI-generated CBT responses, approve or edit drafts,
-          and oversee patient safety flags — all in one place.
+          Manage accounts, oversee crisis escalations, and review the
+          human-in-the-loop case queue.
         </p>
 
         <form onSubmit={submit}>
-          <div className="field">
-            <label>Username</label>
-            <input value={username} onChange={(e) => setU(e.target.value)} autoFocus />
-          </div>
-          <div className="field">
-            <label>Password</label>
-            <input type="password" value={password} onChange={(e) => setP(e.target.value)} />
-          </div>
-          {err && <div className="banner crisis">{err}</div>}
-          <button className="btn accent-login full" disabled={busy} style={{ marginTop: 4 }}>
-            {busy ? <span className="spinner" /> : null}
-            Sign in
+          <label>Username or email</label>
+          <input value={username} onChange={(e) => setU(e.target.value)} autoFocus />
+          <label>Password</label>
+          <input type="password" value={password} onChange={(e) => setP(e.target.value)} />
+          {err && <div className="login-error">{err}</div>}
+          <button className="btn primary block" disabled={busy} style={{ marginTop: 18 }}>
+            {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
-
-        <div className="divider" />
-        <div className="demo-hint">
-          Demo: <strong>clinician</strong> / <strong>clinic123</strong>
-        </div>
       </div>
     </div>
   );

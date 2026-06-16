@@ -60,3 +60,13 @@ class ReviewIn(BaseModel):
     edited_response: str = ""
     edited_technique: str = ""
     rating: Optional[int] = None                # 1-5 for feedback
+
+
+# ---- admin user management ----
+class UserStatusIn(BaseModel):
+    status: str = Field(pattern="^(active|suspended)$")
+    reason: str = ""                            # audit note
+
+
+class UserRoleIn(BaseModel):
+    role: str = Field(pattern="^(user|clinician|admin)$")

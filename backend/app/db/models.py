@@ -45,6 +45,9 @@ class User(Base):
                                                  default=False)
     password_hash: Mapped[str] = mapped_column(String, nullable=False)
     role: Mapped[str] = mapped_column(String, nullable=False, default="user")
+    # Account lifecycle, managed by admins: active | suspended.
+    # Suspended accounts cannot log in; their data stays for clinical review.
+    status: Mapped[str] = mapped_column(String, nullable=False, default="active")
     consent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = _now()
     last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
@@ -52,6 +55,8 @@ class User(Base):
     __table_args__ = (
         CheckConstraint("role IN ('user','clinician','admin')",
                         name="users_role_check"),
+        CheckConstraint("status IN ('active','suspended')",
+                        name="users_status_check"),
     )
 
 
