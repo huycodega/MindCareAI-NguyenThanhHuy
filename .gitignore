@@ -10,6 +10,8 @@ build/
 .venv/
 venv/
 env/
+.pytest_cache/
+.mypy_cache/
 
 # Jupyter
 .ipynb_checkpoints/
@@ -43,6 +45,9 @@ models/safety_gate_multitask.pt
 /eval-model/
 /C2-App-109/
 triage_log*.jsonl
+
+# AI logs — tracked structure, ignored content
+.ai-log/*.jsonl
 
 # OS
 .DS_Store
