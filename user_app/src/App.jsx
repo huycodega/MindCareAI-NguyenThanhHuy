@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { getUser, clearSession, api } from "./api.js";
 import Mascot from "./components/Mascot.jsx";
 import Landing from "./pages/Landing.jsx";
@@ -14,22 +14,96 @@ import TaiNguyen from "./pages/TaiNguyen.jsx";
 import CaiDat from "./pages/CaiDat.jsx";
 
 const NAV_ITEMS = [
-  { id: "dashboard", icon: "🏠", label: "Home" },
-  { id: "sangloc",   icon: "🛡️", label: "Screening" },
-  { id: "chat",      icon: "💬", label: "AI Support" },
-  { id: "baihoc",    icon: "📖", label: "Lessons" },
-  { id: "tainguyen", icon: "🗂️", label: "Resources" },
-  { id: "hoso",      icon: "👤", label: "Profile" },
-  { id: "caidat",    icon: "⚙️",  label: "Settings" },
+  { id: "dashboard", icon: "home", label: "Home" },
+  { id: "sangloc", icon: "shield", label: "Screening" },
+  { id: "chat", icon: "bot", label: "AI Support" },
+  { id: "baihoc", icon: "book", label: "Lessons" },
+  { id: "tainguyen", icon: "folder", label: "Resources" },
+  { id: "hoso", icon: "user", label: "Profile" },
+  { id: "caidat", icon: "settings", label: "Settings" },
 ];
 
 const TOPBAR_TABS = [
-  { id: "dashboard", icon: "🏠", label: "Home" },
-  { id: "baihoc",    icon: "📖", label: "Lessons" },
-  { id: "tainguyen", icon: "🗂️", label: "Resources" },
-  { id: "chat",      icon: "💬", label: "AI Support" },
+  { id: "dashboard", icon: "home", label: "Home" },
+  { id: "baihoc", icon: "book", label: "Lessons" },
+  { id: "tainguyen", icon: "folder", label: "Resources" },
+  { id: "chat", icon: "bot", label: "AI Support" },
 ];
 
+function NavSvgIcon({ name }) {
+  const common = {
+    width: 22,
+    height: 22,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 2,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    "aria-hidden": "true",
+  };
+
+  if (name === "home") {
+    return (
+      <svg {...common} className="nav-svg-icon filled-home">
+        <path d="M3 11.5 12 4l9 7.5" />
+        <path d="M5.5 10.5V20h13v-9.5" />
+        <path d="M9.5 20v-6h5v6" />
+      </svg>
+    );
+  }
+  if (name === "shield") {
+    return (
+      <svg {...common} className="nav-svg-icon">
+        <path d="M12 3 19 6v5c0 4.4-2.8 8.4-7 10-4.2-1.6-7-5.6-7-10V6l7-3Z" />
+        <path d="m9.5 12 1.7 1.7 3.6-4" />
+      </svg>
+    );
+  }
+  if (name === "bot") {
+    return (
+      <svg {...common} className="nav-svg-icon">
+        <path d="M12 8V5" />
+        <path d="M8 5h8" />
+        <rect x="5" y="8" width="14" height="10" rx="5" />
+        <path d="M9 13h.01" />
+        <path d="M15 13h.01" />
+        <path d="M9.5 17c1.6 1 3.4 1 5 0" />
+      </svg>
+    );
+  }
+  if (name === "book") {
+    return (
+      <svg {...common} className="nav-svg-icon">
+        <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21V5.5Z" />
+        <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20" />
+        <path d="M8 7h8" />
+      </svg>
+    );
+  }
+  if (name === "folder") {
+    return (
+      <svg {...common} className="nav-svg-icon">
+        <path d="M3.5 6.5h6l2 2H20.5v10h-17v-12Z" />
+        <path d="M3.5 8.5h17" />
+      </svg>
+    );
+  }
+  if (name === "user") {
+    return (
+      <svg {...common} className="nav-svg-icon">
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
+      </svg>
+    );
+  }
+  return (
+  <svg {...common} className="nav-svg-icon">
+    <circle cx="12" cy="12" r="3.2" />
+    <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.05.05a2 2 0 0 1-2.83 2.83l-.05-.05A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 1.56V21a2 2 0 0 1-4 0v-.04A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.88.34l-.05.05a2 2 0 0 1-2.83-2.83l.05-.05A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1H3a2 2 0 0 1 0-4h.04A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.05-.05a2 2 0 0 1 2.83-2.83l.05.05A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.56V3a2 2 0 0 1 4 0v.04A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.05-.05a2 2 0 0 1 2.83 2.83l-.05.05A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.56 1H21a2 2 0 0 1 0 4h-.04A1.7 1.7 0 0 0 19.4 15Z" />
+  </svg>
+);
+}
 function Topbar({ activePage, onNav, user, onLogout }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const initials = user?.username ? user.username.slice(0, 1).toUpperCase() : "U";
@@ -41,11 +115,11 @@ function Topbar({ activePage, onNav, user, onLogout }) {
     <header className="app-topbar">
       {/* Logo (aligned to sidebar width) */}
       <div className="topbar-logo-section">
-        <div className="topbar-logo-icon">🌿</div>
+        <div className="topbar-logo-icon"><Mascot variant="wave" size={30} /></div>
         <span className="topbar-brand">MindCare AI</span>
       </div>
 
-      {/* Center tabs — only on Home/Dashboard */}
+      {/* Center tabs â€” only on Home/Dashboard */}
       {activePage === "dashboard" && (
         <nav className="topbar-tabs">
           {TOPBAR_TABS.map((tab) => (
@@ -54,7 +128,7 @@ function Topbar({ activePage, onNav, user, onLogout }) {
               className={`topbar-tab ${activePage === tab.id ? "active" : ""}`}
               onClick={() => onNav(tab.id)}
             >
-              <span className="topbar-tab-icon">{tab.icon}</span>
+              <span className="topbar-tab-icon"><NavSvgIcon name={tab.icon} /></span>
               {tab.label}
             </button>
           ))}
@@ -64,7 +138,10 @@ function Topbar({ activePage, onNav, user, onLogout }) {
       {/* Right: notification + user */}
       <div className="topbar-right">
         <button className="topbar-notif" title="Notifications">
-          🔔
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M6 9.5a6 6 0 1 1 12 0c0 4.5 1.8 5.5 1.8 5.5H4.2S6 14 6 9.5z" />
+            <path d="M10 19a2 2 0 0 0 4 0" />
+          </svg>
           <span className="topbar-notif-badge">3</span>
         </button>
         <div className="topbar-user-wrap">
@@ -106,7 +183,7 @@ function Sidebar({ activePage, onNav }) {
             className={`nav-item ${activePage === item.id ? "active" : ""}`}
             onClick={() => onNav(item.id)}
           >
-            <span className="nav-icon">{item.icon}</span>
+            <span className="nav-icon"><NavSvgIcon name={item.icon} /></span>
             {item.label}
           </button>
         ))}
@@ -114,12 +191,18 @@ function Sidebar({ activePage, onNav }) {
 
       {/* Bottom companion card */}
       <div className="sidebar-companion-card">
-        <div className="sidebar-companion-title">MindCare AI<br />is always by your side</div>
+        <div className="sidebar-companion-title">You are not alone</div>
         <div className="sidebar-companion-text">
-          You are not alone. We are here to listen and support you anytime.
+          MindCare AI is always here to listen and accompany you.
         </div>
         <div className="sidebar-companion-mascot">
-          <Mascot variant="concerned" size={120} />
+          <svg className="sidebar-plant" width="70" height="70" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <path d="M20 60h24l-2-12H22z" fill="#E4F0EC" stroke="#7FB8A6" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M32 48V30" stroke="#3F9E78" strokeWidth="2.4" strokeLinecap="round" />
+            <path d="M32 34c-8 0-13-5-13-13 8 0 13 5 13 13z" fill="#9FE0C4" stroke="#3F9E78" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M32 30c8 0 13-5 13-13-8 0-13 5-13 13z" fill="#BDEBD6" stroke="#3F9E78" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M32 40c-5-1-8-4-9-9 5 1 8 4 9 9z" fill="#9FE0C4" stroke="#3F9E78" strokeWidth="2" strokeLinejoin="round" />
+          </svg>
         </div>
       </div>
     </nav>
@@ -191,3 +274,6 @@ export default function App() {
     </div>
   );
 }
+
+
+
