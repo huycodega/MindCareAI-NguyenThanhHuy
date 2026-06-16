@@ -26,11 +26,27 @@ def _grab(field: str, text: str) -> str:
     return m.group(1).strip() if m else ""
 
 
+def _trim_runaway(resp: str) -> str:
+    """Cut a self-continued dialogue. The model sometimes answers, then keeps
+    going and SIMULATES the client's next turn(s) on new lines — fabricating
+    words the client never said. A client-facing CBT reply is one short
+    paragraph, so once the first line is a complete sentence and more text
+    follows, drop the remainder."""
+    resp = (resp or "").strip()
+    if "\n" not in resp:
+        return resp
+    first, rest = resp.split("\n", 1)
+    first = first.strip()
+    if first and first[-1] in ".!?" and rest.strip():
+        return first
+    return resp
+
+
 def parse_draft(raw: str) -> Dict:
     tech = _grab("Technique", raw)
     rat = _grab("Rationale", raw)
     plan = _grab("Plan", raw)
-    resp = _grab("Response", raw)
+    resp = _trim_runaway(_grab("Response", raw))
     well = bool(tech and resp)
     if not resp:
         resp = raw.strip()

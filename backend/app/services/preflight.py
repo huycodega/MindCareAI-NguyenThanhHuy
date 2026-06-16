@@ -10,7 +10,69 @@ Returns (pass: bool, reasons: list[str]) for each draft. A failing draft
 is still stored (we don't drop content silently) but marked
 `preflight_pass=False` and routed harder to clinician attention.
 """
-from typing import Dict, List, Tuple
+import re
+from typing import Dict, List, Optional, Tuple
+
+from app.core.config import settings
+
+
+# ── Canonical CBT technique vocabulary ───────────────────────────────────────
+# The responder must label its Technique with ONE of these. Anything else is
+# treated as a fabricated / non-standard technique name and flagged (so it is
+# never auto-sent without a clinician). Keep this list in sync with the prompt.
+CANONICAL_TECHNIQUES = [
+    "Socratic questioning", "Cognitive restructuring", "Decatastrophizing",
+    "Thought record", "Behavioral activation", "Cognitive reframing",
+    "Reality testing", "Guided discovery", "Problem-solving",
+    "Psychoeducation", "Graded exposure", "Behavioral experiment",
+    "Activity scheduling", "Relaxation training", "Mindfulness",
+    "Worry postponement", "Self-compassion", "Pros and cons analysis",
+    "Downward arrow", "Coping cards", "Grounding techniques",
+    "Crisis referral",
+]
+
+# Common phrasings the model uses → canonical name.
+_TECH_ALIASES = {
+    "examining the evidence": "Reality testing",
+    "evidence examination": "Reality testing",
+    "evidence for and against": "Reality testing",
+    "reframing": "Cognitive reframing",
+    "cognitive reframe": "Cognitive reframing",
+    "reframe": "Cognitive reframing",
+    "exposure": "Graded exposure",
+    "exposure therapy": "Graded exposure",
+    "thought diary": "Thought record",
+    "dysfunctional thought record": "Thought record",
+    "thought challenging": "Cognitive restructuring",
+    "deep breathing": "Relaxation training",
+    "breathing exercise": "Relaxation training",
+    "scheduled worry": "Worry postponement",
+    "worry time": "Worry postponement",
+    "pros and cons": "Pros and cons analysis",
+    "cost benefit analysis": "Pros and cons analysis",
+    "crisis_referral": "Crisis referral",
+    "crisis referral": "Crisis referral",
+}
+
+_NORM = {t.lower(): t for t in CANONICAL_TECHNIQUES}
+
+
+def _normalize(tech: str) -> str:
+    t = (tech or "").strip().lower().replace("_", " ").replace("-", " ")
+    t = re.sub(r"[^a-z\s]", "", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def canonical_technique(tech: str) -> Optional[str]:
+    """Return the canonical technique name, or None if not recognized."""
+    t = _normalize(tech)
+    if not t:
+        return None
+    if t in _NORM:
+        return _NORM[t]
+    if t in _TECH_ALIASES:
+        return _TECH_ALIASES[t]
+    return None
 
 
 # Techniques that should NOT be used at severity=critical.
@@ -70,6 +132,14 @@ def check_draft(draft: Dict, severity: str) -> Tuple[bool, List[str]]:
     # Rule 4: technique must be present + non-empty
     if not tech or tech in ("(unparsed)", "unknown"):
         reasons.append("Technique field empty or unparsed")
+
+    # Rule 5: technique must be a recognized CBT technique (no invented names
+    # like "Eight-step-reality-recheck"). Gated by config so it can be relaxed.
+    elif settings.enforce_canonical_technique and \
+            canonical_technique(draft.get("technique")) is None:
+        reasons.append(
+            f"Non-standard technique name: '{draft.get('technique')}' "
+            f"(not in the canonical CBT set)")
 
     return (len(reasons) == 0, reasons)
 

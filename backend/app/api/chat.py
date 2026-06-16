@@ -27,7 +27,7 @@ from app.schemas.api import ChatIn
 from app.services import (
     safety_gate, analyzer, retrieval, prompt_builder, llm_client,
     post_process, preflight, pii_scrubber, redis_client as rc, calibration,
-    metrics, session_memory, agent, agent_client, user_memory,
+    metrics, session_memory, agent, agent_client, user_memory, triage_log,
 )
 
 
@@ -106,14 +106,42 @@ def chat(body: ChatIn, request: Request,
     text = body.message.strip()
     text_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
 
-    # ---- safety triage (.pt) with cache ----
-    cached = rc.triage_cache_get(text_hash)
+    # ---- resolve the thread FIRST so the safety gate can see prior turns ----
+    convo = _resolve_conversation(db, u.id, body.conversation_id, text)
+
+    # Prior CLIENT turns of this thread (decrypted), most recent last. Reading
+    # each message in isolation caused L1 over-triage with hallucinated reasons;
+    # giving the model context fixes that and (verified) still escalates a
+    # regex-evading crisis. The regex hard-override stays as the backstop.
+    prior_rows = (db.query(models.Session)
+                    .filter_by(conversation_id=convo.id)
+                    .order_by(models.Session.created_at.asc())
+                    .all())
+    turn_index = len(prior_rows)
+    history = [decrypt_str(r.user_input_enc) for r in prior_rows
+               if r.user_input_enc]
+    if settings.safety_use_context and settings.safety_context_turns:
+        safety_history = history[-settings.safety_context_turns:]
+    else:
+        safety_history = []
+
+    # Cache key folds in the context — the same words in a different thread can
+    # triage differently now, so they must not collide on a stale decision.
+    if safety_history:
+        triage_key = hashlib.sha256(
+            ("\n".join(safety_history) + " " + text).encode("utf-8")
+        ).hexdigest()
+    else:
+        triage_key = text_hash
+
+    # ---- safety triage with cache ----
+    cached = rc.triage_cache_get(triage_key)
     if cached:
         triage = cached
         metrics.inc("cbt_triage_cache_total", outcome="hit")
     else:
         with metrics.Timer("cbt_stage_latency_seconds", stage="triage"):
-            triage = safety_gate.assess(text)
+            triage = safety_gate.assess(text, history=safety_history)
         # Post-hoc temperature scaling — fixes overconfidence.
         # Persist BOTH raw and calibrated so audit/eval can replay.
         raw_conf = float(triage.get("confidence", 0.0))
@@ -121,14 +149,25 @@ def chat(body: ChatIn, request: Request,
         triage["confidence_raw"] = raw_conf
         triage["confidence"] = cal_conf
         triage["calibration_T"] = calibration.get_temperature()
-        rc.triage_cache_set(text_hash, triage)
+        rc.triage_cache_set(triage_key, triage)
         metrics.inc("cbt_triage_cache_total", outcome="miss")
 
     level = triage["triage_level"]
     metrics.inc("cbt_triage_level_total", level=level)
 
-    # ---- resolve / create the conversation thread (tasktab) ----
-    convo = _resolve_conversation(db, u.id, body.conversation_id, text)
+    # ---- structured triage log (foundation for the eval set) ----
+    # Logged for EVERY level — L0/L1 included, since those are exactly the
+    # decisions we want to audit for false positives. No raw PHI: a hash plus
+    # a PII-scrubbed preview only.
+    triage_log.record(
+        text_hash=text_hash,
+        preview=pii_scrubber.scrub(text),
+        triage=triage,
+        user_id=str(u.id),
+        conversation_id=str(convo.id),
+        turn_index=turn_index,
+        history_len=len(safety_history),
+    )
 
     base = dict(
         user_id=u.id, intake_id=intake.id, conversation_id=convo.id,
@@ -371,8 +410,72 @@ def chat(body: ChatIn, request: Request,
                          "notified once approved."),
         }
 
-    # ---- L3: auto-send first draft ----
-    chosen = drafts[0]
+    # ---- L3: pick the best draft, then gate before auto-sending ----
+    # Prefer a preflight-passing, better-grounded draft over plain drafts[0].
+    chosen = max(
+        drafts,
+        key=lambda d: (1 if d.get("preflight_pass") else 0,
+                       d.get("grounding_score", 0.0)),
+    ) if drafts else None
+
+    # Anti-fabrication gate: never auto-send a reply that fails preflight (or
+    # falls below the grounding floor, if enabled). Hold it for a clinician
+    # instead — safe by construction (routes to a human, never bypasses one).
+    gate_fail = []
+    if chosen is None:
+        gate_fail.append("no draft produced")
+    else:
+        if settings.autosend_require_preflight and not chosen.get("preflight_pass"):
+            gate_fail.append("preflight failed: " +
+                             "; ".join(chosen.get("preflight_reasons") or []))
+        floor = settings.autosend_grounding_floor
+        if floor > 0 and chosen.get("grounding_score", 0.0) < floor:
+            gate_fail.append(
+                f"grounding {chosen.get('grounding_score')} < floor {floor}")
+
+    # Hard gate: durable memory in the prompt → don't auto-send (see config).
+    mem = (session_ctx or {}).get("memory") or {}
+    if settings.autosend_block_with_memory and mem.get("turn_count", 0) > 0:
+        gate_fail.append(
+            "USER MEMORY present — held for review to prevent memory-narrated "
+            "fabrication")
+
+    if gate_fail:
+        sess = models.Session(
+            **base, status="pending_review", analysis=analysis,
+            retrieved_ids=retrieved_ids, prompt_hash=p_hash)
+        db.add(sess); db.flush()
+        for i, d in enumerate(drafts):
+            db.add(models.Draft(
+                session_id=sess.id, idx=i,
+                technique=d["technique"], rationale=d["rationale"], plan=d["plan"],
+                response_enc=encrypt_phi(d["response"]),
+                well_formed=d["well_formed"],
+                hallucination_score=d["grounding_score"],
+                preflight_pass=d["preflight_pass"],
+            ))
+        db.add(models.ReviewQueue(
+            session_id=sess.id, triage_level=level, priority=2,
+            sla_due_at=_sla_for(level)))
+        audit_mod.audit(db, action="triage_L3_held_for_review", actor=user,
+                         ip=ip, resource_type="session", resource_id=sess.id,
+                         detail={"reasons": gate_fail})
+        metrics.inc("cbt_autosend_blocked_total", severity=triage["severity"])
+        user_memory.update_after_turn(
+            db, u.id, analysis=analysis,
+            technique=chosen["technique"] if chosen else None,
+            severity=triage["severity"])
+        return {
+            "session_id": str(sess.id),
+            "conversation_id": str(convo.id),
+            "outcome": "pending_review",
+            "triage": triage,
+            "message": ("Thank you for sharing. A clinician is reviewing the "
+                         "response before it's sent, to make sure it fits you. "
+                         "You'll be notified once approved."),
+        }
+
+    # ---- L3: auto-send the gated-OK draft ----
     sess = models.Session(
         **base, status="auto_sent",
         analysis=analysis, retrieved_ids=retrieved_ids, prompt_hash=p_hash,

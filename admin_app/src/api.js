@@ -26,8 +26,21 @@ async function req(path, { method = "GET", body } = {}) {
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
+  if (!res.ok) {
+    const detail = data.detail;
+    const msg = Array.isArray(detail)
+      ? detail.map((e) => e.msg || JSON.stringify(e)).join("; ")
+      : (typeof detail === "string" ? detail : `Error ${res.status}`);
+    throw new Error(msg);
+  }
   return data;
+}
+
+function qs(params) {
+  const s = new URLSearchParams(
+    Object.entries(params || {}).filter(([, v]) => v !== "" && v != null)
+  ).toString();
+  return s ? `?${s}` : "";
 }
 
 export const api = {
@@ -37,6 +50,8 @@ export const api = {
       body: { username, password, expected_role: EXPECTED_ROLE },
     }),
   health: () => req("/health"),
+
+  // --- case handling (review queue) ---
   queue: () => req("/admin/queue"),
   adminSession: (sid) => req(`/admin/session/${sid}`),
   review: (sid, payload) =>
@@ -44,4 +59,20 @@ export const api = {
   stats: () => req("/admin/stats"),
   audit: () => req("/admin/audit"),
   dpoExport: () => req("/admin/dpo-export", { method: "POST" }),
+
+  // --- dashboard ---
+  overview: () => req("/admin/overview"),
+
+  // --- user management ---
+  users: (params) => req(`/admin/users${qs(params)}`),
+  userDetail: (uid) => req(`/admin/users/${uid}`),
+  setUserStatus: (uid, status, reason = "") =>
+    req(`/admin/users/${uid}/status`, {
+      method: "POST", body: { status, reason },
+    }),
+  setUserRole: (uid, role) =>
+    req(`/admin/users/${uid}/role`, { method: "POST", body: { role } }),
+
+  // --- crisis oversight ---
+  crisis: (windowDays = 30) => req(`/admin/crisis?window_days=${windowDays}`),
 };
