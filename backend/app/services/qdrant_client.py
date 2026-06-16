@@ -94,14 +94,17 @@ def ensure_collections() -> None:
 
 def search(collection: str, query_vec: List[float], limit: int = 20,
            filter_dict: Optional[dict] = None):
+    """Vector search. Uses query_points() — the .search() method was REMOVED in
+    qdrant-client 1.12+. Returns a list of ScoredPoint (.id/.score/.payload), so
+    callers that iterate hits keep working unchanged."""
     with _lock:
-        return get_qdrant().search(
+        return get_qdrant().query_points(
             collection_name=collection,
-            query_vector=query_vec,
+            query=query_vec,
             limit=limit,
             query_filter=filter_dict,
             with_payload=True,
-        )
+        ).points
 
 
 def upsert(collection: str, points: List[PointStruct]) -> None:

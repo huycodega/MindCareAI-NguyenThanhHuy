@@ -18,6 +18,10 @@ minio==7.2.9
 
 # --- vector store ---
 qdrant-client>=1.18.0
+# qdrant-client local mode breaks on protobuf 5/6 ('MessageFactory' has no
+# attribute 'GetPrototype') — pin to 4.x so RAG search works. protobuf 6 makes
+# every Qdrant search raise and return zero hits (silent RAG outage).
+protobuf>=4.25.3,<5
 
 # --- ml (safety gate + embeddings + BM25 hybrid retrieval) ---
 torch==2.4.1            # CPU is fine for embedder + reranker
