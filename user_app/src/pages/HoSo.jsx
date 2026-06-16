@@ -1,23 +1,68 @@
 import { useState, useEffect } from "react";
 import { api } from "../api.js";
-import MascotCard from "../components/MascotCard.jsx";
-import PageHero from "../components/PageHero.jsx";
+import Mascot from "../components/Mascot.jsx";
 
-const HISTORY_ITEMS = [
-  { icon: "🔍", text: "Completed PHQ-9 Screening — Score: 6/27 (Mild)", date: "15/06/2026" },
-  { icon: "💬", text: "Started using CBT AI Support",                    date: "14/06/2026" },
-  { icon: "📋", text: "Completed Intake Form",                           date: "14/06/2026" },
-  { icon: "✅", text: "Registered MindCare AI account",                  date: "14/06/2026" },
+const RECENT_ACTIVITIES = [
+  { icon: "✓", title: "Completed Screening", detail: "Reviewed your latest wellness check", time: "14/06/2026 · 09:24", tone: "green" },
+  { icon: "📖", title: "Finished Lesson", detail: "Calm thinking practice", time: "13/06/2026 · 20:15", tone: "orange" },
+  { icon: "💬", title: "AI Support Conversation", detail: "Talked about exam stress", time: "13/06/2026 · 19:02", tone: "purple" },
+  { icon: "↓", title: "Downloaded Resource", detail: "Breathing guide 4-7-8", time: "12/06/2026 · 16:48", tone: "blue" },
+  { icon: "★", title: "Earned Achievement", detail: "7-day learning streak", time: "12/06/2026 · 08:30", tone: "gold" },
 ];
 
-const SNAPSHOTS = [
-  { emoji: "😊", label: "Today",     date: "15/06" },
-  { emoji: "🙂", label: "Yesterday", date: "14/06" },
-  { emoji: "😐", label: "Thu",       date: "13/06" },
-  { emoji: "😊", label: "Wed",       date: "12/06" },
-  { emoji: "😔", label: "Tue",       date: "11/06" },
-  { emoji: "🙂", label: "Mon",       date: "10/06" },
+const CONSENT_ITEMS = [
+  "I agree to MindCare AI storing my data to personalize my experience.",
+  "I agree to receive emails about lessons and wellness programs.",
+  "I understand how my data is used for support purposes.",
 ];
+
+function FieldItem({ icon, label, value }) {
+  return (
+    <div className="profile-field-item">
+      <div className="profile-field-icon">{icon}</div>
+      <div>
+        <div className="profile-field-label">{label}</div>
+        <div className="profile-field-value">{value || "—"}</div>
+      </div>
+    </div>
+  );
+}
+
+function EditButton({ children = "Edit" }) {
+  return (
+    <button className="profile-edit-action" type="button">
+      <span>✎</span>
+      {children}
+    </button>
+  );
+}
+
+function ProgressCard({ icon, value, label, meta, accent = "green" }) {
+  return (
+    <div className={`progress-snapshot-card ${accent}`}>
+      <div className="progress-snapshot-icon">{icon}</div>
+      <div className="progress-snapshot-copy">
+        <div className="progress-snapshot-value">{value}</div>
+        <div className="progress-snapshot-label">{label}</div>
+        <div className="progress-snapshot-meta">{meta}</div>
+      </div>
+    </div>
+  );
+}
+
+function RecentActivityItem({ item }) {
+  return (
+    <div className="recent-activity-item">
+      <div className={`recent-activity-icon ${item.tone}`}>{item.icon}</div>
+      <div className="recent-activity-line" />
+      <div className="recent-activity-copy">
+        <div className="recent-activity-title">{item.title}</div>
+        <div className="recent-activity-detail">{item.detail}</div>
+        <div className="recent-activity-time">{item.time}</div>
+      </div>
+    </div>
+  );
+}
 
 export default function HoSo({ user }) {
   const [memory, setMemory] = useState(null);
@@ -38,196 +83,170 @@ export default function HoSo({ user }) {
     });
   }, []);
 
-  const initials = (user?.username || "U").slice(0, 2).toUpperCase();
-  const themes = memory?.recurring_themes || [];
-  const techniques = memory?.techniques_used || [];
+  const userName = (displayName || user?.username || "there").split("@")[0];
+  const initials = userName.slice(0, 2).toUpperCase();
   const turnCount = memory?.turn_count || 0;
-
-  const greetName = (displayName || user?.username || "there").split("@")[0];
+  const fullName = displayName || user?.username || "MindCare User";
+  const email = user?.email || (user?.username?.includes("@") ? user.username : "user@example.com");
+  const ageGroup = intake?.demographics?.age || intake?.age_group || "18-24";
+  const gender = intake?.demographics?.gender || intake?.gender || "Prefer not to say";
 
   return (
-    <>
-      <PageHero
-        title={`Hi, ${greetName} 👋`}
-        subtitle="Track your mental wellness journey, review your history, and see what you've accomplished so far."
-        mascot="success"
-      />
-      <div className="profile-layout">
-      <div className="profile-left">
-        <div className="card">
-          <div className="profile-header">
-            <div className="profile-avatar-wrap">
+    <div className="profile-page-v2">
+      <header className="profile-page-header">
+        <div>
+          <h1>Your Profile</h1>
+          <p>Manage your personal information and track your mental wellness journey.</p>
+        </div>
+      </header>
+
+      <div className="profile-dashboard-grid">
+        <main className="profile-main-column">
+          <section className="profile-card profile-identity-card">
+            <div className="profile-avatar-wrap large">
               <div className="profile-avatar">{initials}</div>
-              <div className="profile-avatar-edit" title="Change photo">✏️</div>
+              <button className="profile-avatar-camera" type="button" aria-label="Change profile photo">⌕</button>
             </div>
-            <div style={{ flex: 1 }}>
-              {editing ? (
-                <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
-                  <input
-                    className="input"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    style={{ maxWidth: 200 }}
-                  />
-                  <button className="btn btn-primary btn-sm" onClick={() => setEditing(false)}>Save</button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setDisplayName(user?.username || ""); setEditing(false); }}>Cancel</button>
-                </div>
-              ) : (
-                <div className="profile-name">{displayName || user?.username}</div>
-              )}
-              <div className="profile-email">{user?.email || "—"}</div>
-              <div className="profile-tags" style={{ marginTop: 8 }}>
-                <span className="badge badge-green">User</span>
-                {themes.slice(0, 2).map((t) => (
-                  <span key={t} className="badge badge-blue">{t}</span>
-                ))}
-              </div>
-              {!editing && (
-                <button className="btn btn-ghost btn-sm profile-edit-btn" onClick={() => setEditing(true)}>
-                  ✏️ Edit
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
 
-        <div className="stats-row-mini">
-          <div className="mini-stat">
-            <div className="mini-stat-value">{conversations.length}</div>
-            <div className="mini-stat-label">Sessions</div>
-          </div>
-          <div className="mini-stat">
-            <div className="mini-stat-value">{turnCount}</div>
-            <div className="mini-stat-label">Exchanges</div>
-          </div>
-          <div className="mini-stat">
-            <div className="mini-stat-value">3</div>
-            <div className="mini-stat-label">Lessons done</div>
-          </div>
-          <div className="mini-stat">
-            <div className="mini-stat-value">5🔥</div>
-            <div className="mini-stat-label">Day streak</div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="section-header">
-            <div className="section-title">Personal Information</div>
-            <button className="section-link">Edit</button>
-          </div>
-          <div className="profile-info-grid">
-            <div className="profile-info-item">
-              <div className="profile-info-label">Username</div>
-              <div className="profile-info-value">{user?.username || "—"}</div>
-            </div>
-            <div className="profile-info-item">
-              <div className="profile-info-label">Email</div>
-              <div className="profile-info-value">{user?.email || "—"}</div>
-            </div>
-            <div className="profile-info-item">
-              <div className="profile-info-label">Joined</div>
-              <div className="profile-info-value">14/06/2026</div>
-            </div>
-            <div className="profile-info-item">
-              <div className="profile-info-label">Role</div>
-              <div className="profile-info-value">User</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="section-header">
-            <div className="section-title">Mental Health History</div>
-          </div>
-          <div className="history-list">
-            {HISTORY_ITEMS.map((item, i) => (
-              <div key={i} className="history-item">
-                <div className="history-icon">{item.icon}</div>
+            <div className="profile-identity-content">
+              <div className="profile-identity-topline">
                 <div>
-                  <div className="history-text">{item.text}</div>
-                  <div className="history-date">{item.date}</div>
+                  {editing ? (
+                    <div className="profile-name-editor">
+                      <input
+                        className="input"
+                        value={displayName}
+                        onChange={(e) => setDisplayName(e.target.value)}
+                        aria-label="Display name"
+                      />
+                      <button className="btn btn-primary btn-sm" type="button" onClick={() => setEditing(false)}>Save</button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        type="button"
+                        onClick={() => {
+                          setDisplayName(user?.username || "");
+                          setEditing(false);
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <h2>Hello, {userName}! 👋</h2>
+                  )}
+                  <p>MindCare AI is here to support your mental wellness every day.</p>
+                </div>
+                {!editing && <button className="btn btn-ghost" type="button" onClick={() => setEditing(true)}>✎ Edit Profile</button>}
+              </div>
+
+              <div className="profile-info-panel">
+                <FieldItem icon="👤" label="Full Name" value={fullName} />
+                <FieldItem icon="☎" label="Phone Number" value="0901 234 567" />
+                <FieldItem icon="✉" label="Email" value={email} />
+                <FieldItem icon="📅" label="Date of Birth" value="12/06/2003" />
+                <FieldItem icon="⚥" label="Gender" value={gender} />
+                <FieldItem icon="◌" label="Age Group" value={ageGroup} />
+              </div>
+            </div>
+          </section>
+
+          <section className="profile-card profile-detail-section">
+            <div className="profile-section-heading">
+              <div>
+                <span className="profile-section-kicker">Safety network</span>
+                <h3>Emergency Contact</h3>
+              </div>
+              <EditButton />
+            </div>
+            <div className="emergency-contact-grid">
+              <FieldItem icon="👥" label="Contact Name" value="Nguyen Van Nam" />
+              <FieldItem icon="♡" label="Relationship" value="Father" />
+              <FieldItem icon="☎" label="Phone Number" value="0909 876 543" />
+            </div>
+          </section>
+
+          <section className="profile-card profile-detail-section">
+            <div className="profile-section-heading">
+              <div>
+                <span className="profile-section-kicker">Personal focus</span>
+                <h3>Mental Wellness Goal</h3>
+              </div>
+              <EditButton />
+            </div>
+            <p className="wellness-goal-text">
+              Reduce stress, improve sleep quality, and maintain emotional balance.
+            </p>
+          </section>
+
+          <section className="profile-card profile-consent-card">
+            <div className="profile-section-heading">
+              <div>
+                <span className="profile-section-kicker">Data choices</span>
+                <h3>Privacy &amp; Consent</h3>
+              </div>
+            </div>
+            <div className="consent-content-grid">
+              <div className="consent-checklist">
+                {CONSENT_ITEMS.map((item) => (
+                  <div className="consent-check-item" key={item}>
+                    <span>✓</span>
+                    <p>{item}</p>
+                  </div>
+                ))}
+                <div className="profile-policy-links">
+                  <a href="#privacy">Privacy Policy</a>
+                  <a href="#terms">Terms of Service</a>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {intake && (
-          <div className="card">
-            <div className="section-header">
-              <div className="section-title">Initial Intake Information</div>
-            </div>
-            <div style={{ fontSize: 14, color: "var(--ink)", lineHeight: 1.7, background: "var(--surface-2)", padding: 14, borderRadius: 10, border: "1px solid var(--line)" }}>
-              {intake.summary || intake.raw_text || "No intake information available."}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="profile-right">
-        <MascotCard
-          variant="success"
-          title="You're doing great! 🌟"
-          text="Every day you invest in your mental health is a small victory worth being proud of."
-          size={72}
-        />
-
-        <div className="card">
-          <div className="section-title" style={{ marginBottom: 12 }}>Mood Snapshots</div>
-          <div className="snapshot-grid">
-            {SNAPSHOTS.map((s, i) => (
-              <div key={i} className="snapshot-card">
-                <div className="snapshot-emoji">{s.emoji}</div>
-                <div className="snapshot-label">{s.label}</div>
-                <div className="snapshot-date">{s.date}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="section-title" style={{ marginBottom: 12 }}>🧩 What AI Remembers About You</div>
-          {themes.length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Recurring Themes</div>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                {themes.map((t) => (
-                  <span key={t} className="badge badge-green">{t}</span>
-                ))}
+              <div className="consent-status-panel">
+                <div className="consent-status-row">
+                  <span>Consent Status</span>
+                  <strong>Agreed</strong>
+                </div>
+                <div className="consent-status-row">
+                  <span>Last Updated Date</span>
+                  <strong>14/06/2026</strong>
+                </div>
               </div>
             </div>
-          )}
-          {techniques.length > 0 && (
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-soft)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Techniques Used</div>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                {techniques.map((t) => (
-                  <span key={t} className="badge badge-blue">{t}</span>
-                ))}
+          </section>
+
+          <section className="profile-card progress-snapshot-section">
+            <div className="profile-section-heading compact">
+              <div>
+                <h3>Progress Snapshot</h3>
+                <p>A quick view of your mental wellness journey.</p>
               </div>
             </div>
-          )}
-          {themes.length === 0 && techniques.length === 0 && (
-            <div style={{ textAlign: "center", color: "var(--ink-soft)", fontSize: 13, padding: "16px 0" }}>
-              No data yet. Start chatting with AI! 💬
+            <div className="progress-snapshot-grid">
+              <ProgressCard icon="✓" value="8" label="Screenings Completed" meta="Last completed: 14/06/2026" />
+              <ProgressCard icon="🔥" value="5" label="Learning Streak" meta="Small steps, steady rhythm" accent="orange" />
+              <ProgressCard icon="💬" value={conversations.length || turnCount} label="AI Support Sessions" meta="Support is always available" accent="blue" />
+              <ProgressCard icon="📁" value="12" label="Resources Accessed" meta="Helpful tools saved" accent="mint" />
             </div>
-          )}
-        </div>
+          </section>
+        </main>
 
-        <div className="card">
-          <div className="section-title" style={{ marginBottom: 12 }}>📊 Latest Screening Result</div>
-          <div style={{ textAlign: "center", padding: "12px 0" }}>
-            <div style={{ fontSize: 36, fontWeight: 700, color: "var(--success)" }}>6</div>
-            <div style={{ fontSize: 13, color: "var(--ink-soft)" }}>/ 27 — PHQ-9</div>
-            <div className="progress-bar" style={{ margin: "10px 0" }}>
-              <div className="progress-fill" style={{ width: "22%" }} />
+        <aside className="profile-sidebar-column">
+          <section className="profile-card profile-motivation-card">
+            <Mascot variant="success" size={180} />
+            <h3>You're doing great! 💚</h3>
+            <p>Keep taking small steps toward better mental wellness.</p>
+            <button className="btn btn-primary btn-full" type="button">Start Today's Journey</button>
+          </section>
+
+          <section className="profile-card recent-activity-card">
+            <div className="profile-section-heading compact">
+              <h3>Recent Activity</h3>
             </div>
-            <div className="badge badge-green">Mild</div>
-            <div style={{ fontSize: 11, color: "var(--ink-soft)", marginTop: 8 }}>Last: 15/06/2026</div>
-          </div>
-        </div>
+            <div className="recent-activity-list">
+              {RECENT_ACTIVITIES.map((item) => (
+                <RecentActivityItem item={item} key={item.title} />
+              ))}
+            </div>
+          </section>
+        </aside>
       </div>
-      </div>
-    </>
+    </div>
   );
 }

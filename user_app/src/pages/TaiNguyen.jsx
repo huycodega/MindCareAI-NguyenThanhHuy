@@ -1,85 +1,178 @@
-import { useState } from "react";
-import MascotCard from "../components/MascotCard.jsx";
-import PageHero from "../components/PageHero.jsx";
+﻿import { useState } from "react";
+import Mascot from "../components/Mascot.jsx";
 
-const FILTER_TABS = ["All", "Articles", "Audio", "Video", "Journal", "CBT"];
+const FILTER_TABS = ["All", "Articles", "Audio", "Video", "Emergency", "CBT Tools"];
 
 const RESOURCES = [
   {
-    id: 1, type: "article", typeLabel: "Articles", icon: "📄",
-    thumb: "📰",
-    title: "5-4-3-2-1 Technique for Instant Anxiety Relief",
-    desc: "A detailed guide to the 5-sense grounding technique for beginners",
-    duration: "5 min read", tags: ["Anxiety", "Grounding", "Quick technique"],
-    views: "1.2k", saved: true,
+    id: 1,
+    category: "Audio",
+    typeLabel: "Audio",
+    icon: "\u266A",
+    title: "4-7-8 Breathing Exercise",
+    desc: "A simple breathing technique to help reduce anxiety and relax your body.",
+    duration: "5 min",
+    tags: ["Anxiety", "Breathing"],
+    action: "Listen Now",
+    saved: true,
+    thumbClass: "breathing",
   },
   {
-    id: 2, type: "audio", typeLabel: "Audio", icon: "🎧",
-    thumb: "🎵",
-    title: "Guided Meditation — Morning Stress Relief",
-    desc: "A 10-minute meditation to start your day with a calm mind",
-    duration: "10 min", tags: ["Meditation", "Stress", "Morning"],
-    views: "2.4k", saved: false,
+    id: 2,
+    category: "Articles",
+    typeLabel: "Article",
+    icon: "\uD83D\uDCC4",
+    title: "5-4-3-2-1 Grounding Technique",
+    desc: "A grounding exercise to help you reconnect with the present moment.",
+    duration: "7 min read",
+    tags: ["Grounding", "Present moment"],
+    action: "Read Now",
+    saved: true,
+    thumbClass: "grounding",
   },
   {
-    id: 3, type: "video", typeLabel: "Video", icon: "🎬",
-    thumb: "🎥",
-    title: "CBT Basics: How to Identify Negative Thoughts",
-    desc: "Video explaining the cognitive–emotion–behavior triangle in CBT",
-    duration: "8 min", tags: ["CBT", "Thinking", "Basics"],
-    views: "3.1k", saved: false,
+    id: 3,
+    category: "Video",
+    typeLabel: "Video",
+    icon: "\u25B6",
+    title: "Tips to Improve Your Sleep",
+    desc: "Small habits that can help you sleep better and wake up with more energy.",
+    duration: "8 min",
+    tags: ["Sleep", "Daily habits"],
+    action: "Watch Now",
+    saved: false,
+    thumbClass: "sleep",
   },
   {
-    id: 4, type: "exercise", typeLabel: "CBT", icon: "🧩",
-    thumb: "✍️",
-    title: "Thought Record Exercise",
-    desc: "A worksheet to help analyze and reframe negative thoughts",
-    duration: "15 min", tags: ["Thought Record", "CBT", "Practice"],
-    views: "890", saved: true,
+    id: 4,
+    category: "CBT Tools",
+    typeLabel: "Tool",
+    icon: "\u260E",
+    title: "Talk to a Counselor",
+    desc: "Need support from a professional? Book a private consultation easily.",
+    duration: "Personal Support",
+    tags: ["Personal Support", "Counseling"],
+    action: "Book Now",
+    saved: false,
+    thumbClass: "counselor",
+    useImageIcon: true,
   },
   {
-    id: 5, type: "journal", typeLabel: "Journal", icon: "📓",
-    thumb: "📖",
-    title: "Daily Emotion Journal Template",
-    desc: "A guide to journaling emotions using the CBT method",
-    duration: "10 min/day", tags: ["Journal", "Emotions", "Habit"],
-    views: "1.5k", saved: false,
+    id: 5,
+    category: "CBT Tools",
+    typeLabel: "CBT Tool",
+    icon: "\u270E",
+    title: "Emotion Journal",
+    desc: "Record your daily emotions to understand yourself better and track progress.",
+    duration: "Self-awareness",
+    tags: ["Self-awareness", "Reflection"],
+    action: "Use Now",
+    saved: true,
+    thumbClass: "journal",
+    useImageIcon: true,
   },
   {
-    id: 6, type: "article", typeLabel: "Articles", icon: "📄",
-    thumb: "🌙",
-    title: "Improve Sleep with CBT-I Techniques",
-    desc: "A summary of CBT techniques designed specifically for insomnia",
-    duration: "7 min read", tags: ["Sleep", "Insomnia", "CBT-I"],
-    views: "2.0k", saved: false,
+    id: 6,
+    category: "Emergency",
+    typeLabel: "Emergency",
+    icon: "!",
+    title: "24/7 Hotline",
+    desc: "Free, confidential support available whenever you need someone to listen.",
+    duration: "24/7",
+    tags: ["24/7", "Immediate support"],
+    action: "Call 1900 1234",
+    saved: false,
+    thumbClass: "hotline",
+    useImageIcon: true,
+    emergency: true,
   },
 ];
 
-const SUGGESTED_RESOURCES = [
-  { icon: "🌿", title: "Box Breathing Exercise",             type: "Audio",   time: "5 min" },
-  { icon: "📋", title: "Daily Self-Care Checklist",          type: "Journal", time: "5 min" },
-  { icon: "🧘", title: "Gentle Yoga for Anxiety",            type: "Video",   time: "20 min" },
-  { icon: "💡", title: "10 Mood Self-Check Questions",       type: "Article", time: "3 min" },
+const SAVED_FALLBACK = [
+  "4-7-8 Breathing Exercise",
+  "5-4-3-2-1 Grounding Technique",
+  "Emotion Journal",
 ];
 
-const TYPE_BADGE_CLASS = {
-  article:  "rtype-article",
-  audio:    "rtype-audio",
-  video:    "rtype-video",
-  exercise: "rtype-exercise",
-  journal:  "rtype-journal",
-};
+
+function BookmarkIcon({ filled = true }) {
+  return (
+    <svg className="bookmark-svg" viewBox="0 0 16 22" aria-hidden="true" focusable="false">
+      <path
+        d="M3 2.75C3 1.78 3.78 1 4.75 1h6.5C12.22 1 13 1.78 13 2.75V20l-5-3.15L3 20V2.75Z"
+        fill={filled ? "currentColor" : "none"}
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+function ResourceCard({ resource, saved, onToggleSave }) {
+  return (
+    <article className={`resource-v2-card ${resource.emergency ? "emergency" : ""}`}>
+      <div className={`resource-v2-thumb ${resource.thumbClass} ${resource.useImageIcon ? "image-icon" : ""}`}>
+        {!resource.useImageIcon && (
+          <span className={`resource-v2-icon-badge ${resource.category.toLowerCase().replace(/\s+/g, "-")}`}>
+            {resource.icon}
+          </span>
+        )}
+      </div>
+      <div className="resource-v2-body">
+        <div className="resource-v2-card-head">
+          <span className="resource-v2-type">{resource.typeLabel}</span>
+          <button
+            className={`resource-save-btn ${saved ? "saved" : ""}`}
+            type="button"
+            onClick={() => onToggleSave(resource.id)}
+            aria-label={saved ? "Remove saved resource" : "Save resource"}
+          >
+            <BookmarkIcon filled={saved} />
+          </button>
+        </div>
+        <h3>{resource.title}</h3>
+        <p>{resource.desc}</p>
+        <div className="resource-v2-tags">
+          {resource.tags.map((tag) => (
+            <span key={tag}>{tag}</span>
+          ))}
+          <span>{resource.duration}</span>
+        </div>
+      </div>
+      <button className={`resource-v2-action ${resource.emergency ? "danger" : ""}`} type="button">
+        {resource.action}
+      </button>
+    </article>
+  );
+}
+
+function SavedResourceItem({ title, resource }) {
+  return (
+    <div className="saved-resource-item">
+      <div className={`saved-resource-icon ${resource?.thumbClass || "journal"}`}>{resource?.icon || "\uD83D\uDCC4"}</div>
+      <div>
+        <div className="saved-resource-title">{title}</div>
+        <div className="saved-resource-meta">{resource?.typeLabel || "Resource"} {"\u00B7"} {resource?.duration || "Saved"}</div>
+      </div>
+      <span className="saved-resource-bookmark"><BookmarkIcon /></span>
+    </div>
+  );
+}
 
 export default function TaiNguyen() {
   const [activeTab, setActiveTab] = useState("All");
   const [search, setSearch] = useState("");
+  const [sort, setSort] = useState("Newest");
   const [savedItems, setSavedItems] = useState(new Set(RESOURCES.filter((r) => r.saved).map((r) => r.id)));
 
-  const filtered = RESOURCES.filter((r) => {
-    const matchTab = activeTab === "All" || r.typeLabel === activeTab;
-    const matchSearch = !search || r.title.toLowerCase().includes(search.toLowerCase()) || r.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()));
-    return matchTab && matchSearch;
+  const filtered = RESOURCES.filter((resource) => {
+    const text = `${resource.title} ${resource.desc} ${resource.typeLabel} ${resource.tags.join(" ")}`.toLowerCase();
+    const matchSearch = !search || text.includes(search.toLowerCase());
+    const matchTab = activeTab === "All" || resource.category === activeTab;
+    return matchSearch && matchTab;
   });
+
+  const savedResources = RESOURCES.filter((resource) => savedItems.has(resource.id));
 
   function toggleSave(id) {
     setSavedItems((prev) => {
@@ -91,147 +184,109 @@ export default function TaiNguyen() {
   }
 
   return (
-    <>
-      <PageHero
-        title="Resources"
-        subtitle="Explore curated articles, audio, videos, and exercises to support your mental wellness — anytime you need them."
-        right={
-          <div className="hero-emergency">
-            <div className="hero-emergency-title">🆘 Need help now?</div>
-            <div className="hero-emergency-text">
-              If you're in crisis, you don't have to face it alone. Reach out for immediate support.
+    <div className="resources-page-v2">
+      <div className="resources-v2-grid">
+        <main className="resources-v2-main">
+          <header className="resources-v2-header">
+            <div>
+              <h1>Resources</h1>
+              <p>Explore articles, exercises, and tools designed to support your mental wellness every day.</p>
             </div>
-            <a className="hero-emergency-btn" href="tel:1800599920">📞 Call 1800 599 920</a>
-          </div>
-        }
-      />
-      <div className="resources-layout">
-      <div className="resources-left">
-        <div className="search-bar-wrap">
-          <span className="search-icon">🔍</span>
-          <input
-            type="text"
-            className="search-bar"
-            placeholder="Search resources..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+          </header>
 
-        <div className="filter-tabs">
-          {FILTER_TABS.map((tab) => (
-            <button
-              key={tab}
-              className={`filter-tab ${activeTab === tab ? "active" : ""}`}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-
-        {filtered.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px 0", color: "var(--ink-soft)" }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>🔍</div>
-            <div>No results found</div>
+          <div className="resources-v2-toolbar">
+            <label className="resources-v2-search">
+              <span>{"\u2315"}</span>
+              <input
+                type="text"
+                placeholder="Search resources..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </label>
+            <select className="resources-v2-sort" value={sort} onChange={(event) => setSort(event.target.value)} aria-label="Sort resources">
+              <option>Newest</option>
+              <option>Most popular</option>
+              <option>Shortest</option>
+            </select>
           </div>
-        ) : (
-          <div className="resources-grid">
-            {filtered.map((r) => (
-              <div key={r.id} className="resource-card">
-                <div className="resource-thumb">{r.thumb}</div>
-                <div>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
-                    <span className={`resource-type-badge ${TYPE_BADGE_CLASS[r.type] || ""}`}>
-                      {r.icon} {r.typeLabel}
-                    </span>
-                    <button
-                      style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: savedItems.has(r.id) ? "var(--primary)" : "var(--ink-soft)" }}
-                      onClick={() => toggleSave(r.id)}
-                      title={savedItems.has(r.id) ? "Unsave" : "Save"}
-                    >
-                      {savedItems.has(r.id) ? "🔖" : "🏷️"}
-                    </button>
-                  </div>
-                  <div className="resource-title">{r.title}</div>
-                  <div style={{ fontSize: 12, color: "var(--ink-soft)", margin: "4px 0 8px", lineHeight: 1.5 }}>{r.desc}</div>
-                  <div className="resource-meta">
-                    <span>⏱ {r.duration}</span>
-                    <span>👁 {r.views} views</span>
-                  </div>
-                  <div className="resource-tags" style={{ marginTop: 8 }}>
-                    {r.tags.map((t) => (
-                      <span key={t} className="resource-tag">{t}</span>
-                    ))}
-                  </div>
-                </div>
-                <button className="btn btn-secondary btn-sm btn-full">
-                  {r.type === "audio" ? "▶ Listen" : r.type === "video" ? "▶ Watch" : r.type === "exercise" ? "✍️ Start exercise" : r.type === "journal" ? "📝 Use template" : "📖 Read now"}
-                </button>
-              </div>
+
+          <div className="resources-v2-tabs" role="tablist" aria-label="Resource categories">
+            {FILTER_TABS.map((tab) => (
+              <button
+                key={tab}
+                className={activeTab === tab ? "active" : ""}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+              >
+                {tab}
+              </button>
             ))}
           </div>
-        )}
-      </div>
 
-      <div className="resources-right">
-        <MascotCard
-          variant="resources"
-          title="Need support right now? 🌿"
-          text="Don't hesitate to share — AI Support is always ready to listen 24/7."
-          size={72}
-        />
+          {filtered.length === 0 ? (
+            <div className="resources-empty-state">
+              <div>{"\u2315"}</div>
+              <h3>No resources found</h3>
+              <p>Try another keyword or choose a different category.</p>
+            </div>
+          ) : (
+            <section className="resources-v2-card-grid" aria-label="Resource list">
+              {filtered.map((resource) => (
+                <ResourceCard
+                  key={resource.id}
+                  resource={resource}
+                  saved={savedItems.has(resource.id)}
+                  onToggleSave={toggleSave}
+                />
+              ))}
+            </section>
+          )}
 
-        <div className="emergency-banner">
-          <h3>🆘 Need help immediately?</h3>
-          <p>Contact the mental health support line available 24/7</p>
-          <div className="emergency-phone">📞 1800 599 920</div>
-        </div>
+          <footer className="resources-v2-note">
+            <span>{"\u25C7"}</span>
+            All resources are reviewed by professionals and based on evidence-informed practices.
+          </footer>
+        </main>
 
-        {savedItems.size > 0 && (
-          <div className="card">
-            <div className="section-title" style={{ marginBottom: 10 }}>🔖 Saved ({savedItems.size})</div>
-            {RESOURCES.filter((r) => savedItems.has(r.id)).map((r) => (
-              <div key={r.id} style={{ display: "flex", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--line)", cursor: "pointer" }}>
-                <div style={{ fontSize: 20 }}>{r.thumb}</div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)", lineHeight: 1.3 }}>{r.title}</div>
-                  <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>{r.duration}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="card">
-          <div className="section-title" style={{ marginBottom: 12 }}>✨ Recommended Resources</div>
-          {SUGGESTED_RESOURCES.map((r, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: i < SUGGESTED_RESOURCES.length - 1 ? "1px solid var(--line)" : "none", cursor: "pointer" }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: "var(--primary-soft)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, flexShrink: 0 }}>{r.icon}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ink)" }}>{r.title}</div>
-                <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>{r.type} · {r.time}</div>
+        <aside className="resources-v2-sidebar">
+          <section className="resources-v2-emergency-card">
+            <div className="resources-emergency-copy">
+              <div className="resources-alert-icon">!</div>
+              <div>
+                <h2>Need support now?</h2>
+                <p>If you are in crisis or thinking about harming yourself, please seek help immediately.</p>
+                <button type="button">Get Emergency Support</button>
               </div>
             </div>
-          ))}
-        </div>
+            <Mascot variant="concerned" size={118} />
+          </section>
 
-        <div className="card">
-          <div className="section-title" style={{ marginBottom: 10 }}>📊 Your Activity</div>
-          {[
-            { label: "Articles read",     value: "4", icon: "📄" },
-            { label: "Audio listened",    value: "2", icon: "🎧" },
-            { label: "Exercises done",    value: "1", icon: "🧩" },
-            { label: "Currently saved",   value: `${savedItems.size}`, icon: "🔖" },
-          ].map((s) => (
-            <div key={s.label} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--line)", fontSize: 13 }}>
-              <span style={{ color: "var(--ink-soft)" }}>{s.icon} {s.label}</span>
-              <span style={{ fontWeight: 700, color: "var(--ink)" }}>{s.value}</span>
+          <section className="resources-v2-side-card">
+            <div className="resources-v2-side-head">
+              <h2>Saved Resources</h2>
+              <button type="button">View all</button>
             </div>
-          ))}
-        </div>
+            <div className="saved-resource-list">
+              {(savedResources.length ? savedResources : SAVED_FALLBACK.map((title) => RESOURCES.find((r) => r.title === title))).slice(0, 3).map((resource, index) => {
+                const title = typeof resource === "string" ? resource : resource?.title || SAVED_FALLBACK[index];
+                return <SavedResourceItem key={title} title={title} resource={typeof resource === "string" ? null : resource} />;
+              })}
+            </div>
+            <button className="view-saved-btn" type="button">View all saved resources</button>
+          </section>
+
+          <section className="resources-v2-motivation-card">
+            <div>
+              <h2>You deserve care {"\u2665"}</h2>
+              <p>Taking a few minutes for your mental health each day can make a real difference.</p>
+              <button type="button">Explore Recommended Exercises</button>
+            </div>
+            <Mascot variant="resources" size={112} />
+          </section>
+        </aside>
       </div>
-      </div>
-    </>
+    </div>
   );
 }
+
