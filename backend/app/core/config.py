@@ -123,6 +123,46 @@ class Settings(BaseSettings):
     triage_high_threshold: float = 0.65
     triage_mod_threshold: float = 0.40
 
+    # ---- L3 auto-send anti-fabrication gate ----
+    # A poorly-formed or rule-violating reply must never be auto-sent to a
+    # client without a human. When the best L3 draft fails preflight (or, if a
+    # grounding floor > 0 is set, scores below it against retrieved knowledge),
+    # the turn is downgraded to clinician review instead of auto-sending.
+    # The effect is always safe — it only routes MORE to humans, never less.
+    autosend_require_preflight: bool = True
+    autosend_grounding_floor: float = 0.0   # 0 = off (grounding-vs-KB is noisy)
+    # Hard guarantee: when durable USER MEMORY is injected into the prompt, the
+    # model can narrate it as a fabricated shared history ("our talks about…").
+    # No automated check reliably catches that, so when memory is present an L3
+    # reply is NOT auto-sent — it's held for a clinician. Trades more review for
+    # certainty. New users (no memory yet) still get instant L3 replies.
+    autosend_block_with_memory: bool = True
+    # Require the draft's Technique to be a recognized CBT technique; a made-up
+    # name (e.g. "Eight-step-reality-recheck") fails preflight → held for review.
+    enforce_canonical_technique: bool = True
+
+    # ---- safety context window ----
+    # Feed the prior client turns of the thread to the safety model. Reading
+    # each message in ISOLATION caused L1 over-triage with hallucinated reasons;
+    # the A/B/C experiment (scripts/triage_context_experiment.py) showed context
+    # + a "don't downgrade real intent" hint fixes the false positives AND still
+    # escalates a regex-evading crisis to L0. The regex hard-override remains a
+    # backstop. Toggle off here to revert to isolated-message triage.
+    safety_use_context: bool = True
+    safety_context_turns: int = 4
+
+    # ---- triage decision log (foundation for the eval set) ----
+    # One JSONL line per triage decision: raw model output, heuristic vs
+    # model level, confidences, source, disagreement flag. NO raw PHI text —
+    # only a sha256 hash — so the log is safe to keep and replay for tuning.
+    triage_log_enabled: bool = True
+    triage_log_path: str = "/app/data/triage_log.jsonl"
+    # When the heuristic hard-overrides to L0/L1, STILL call the model (in
+    # non-mock mode) to RECORD what it would have said. The override stands —
+    # this only captures the regex's false-positive rate as data. Costs one
+    # extra Modal call on L0/L1 turns; set False to disable.
+    triage_shadow_model_on_override: bool = True
+
     # ---- seed accounts (created on first boot) ----
     seed_users: list = [
         {"username": "user", "password": "user123", "role": "user"},

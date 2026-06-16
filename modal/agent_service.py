@@ -72,53 +72,95 @@ model_cache = modal.Volume.from_name("cbt-model-cache", create_if_missing=True)
 # ─────────────────────────────────────────────────────────────────────────────
 # Tool-call parsing
 # ─────────────────────────────────────────────────────────────────────────────
+def _iter_balanced_objects(text: str):
+    """Yield each top-level {...} substring with BALANCED braces (string-aware).
+    Unlike a flat regex this handles nested objects, e.g. an `arguments` value
+    that is itself a JSON object — the exact case Qwen2.5 tool calls produce."""
+    i, n = 0, len(text)
+    while i < n:
+        if text[i] == "{":
+            depth, j, in_str, esc = 0, i, False, False
+            while j < n:
+                c = text[j]
+                if in_str:
+                    if esc:
+                        esc = False
+                    elif c == "\\":
+                        esc = True
+                    elif c == '"':
+                        in_str = False
+                else:
+                    if c == '"':
+                        in_str = True
+                    elif c == "{":
+                        depth += 1
+                    elif c == "}":
+                        depth -= 1
+                        if depth == 0:
+                            yield text[i:j + 1]
+                            i = j
+                            break
+                j += 1
+        i += 1
+
+
+def _coerce_call(obj: dict):
+    """{"name", "arguments"|"parameters"} → normalized call, or None."""
+    if not isinstance(obj, dict):
+        return None
+    name = obj.get("name")
+    if not name:
+        return None
+    args = obj.get("arguments", obj.get("parameters", {}))
+    if isinstance(args, str):
+        try:
+            args = json.loads(args)
+        except json.JSONDecodeError:
+            args = {"_raw": args}
+    return {"name": name, "arguments": args or {}}
+
+
 def _parse_tool_calls(raw: str):
     """
     Extract tool calls from cbt-qwen2.5-7b-v2 output.
 
-    Returns (content, tool_calls) where tool_calls is a list of
-    {"name": str, "arguments": dict}. When no tool call is found, content
-    carries the prose and tool_calls is empty.
+    Returns (content, tool_calls) with tool_calls a list of
+    {"name": str, "arguments": dict}. Handles the Qwen2.5 native
+    <tool_call>{...}</tool_call> wrapper (closing tag optional) AND nested
+    `arguments` objects. When nothing parses, content carries the prose.
     """
-    text = raw.strip()
-    # Strip python tag if present (Qwen2.5 may emit <|python_tag|>)
-    text = text.replace("<|python_tag|>", "").strip()
-
+    text = raw.strip().replace("<|python_tag|>", "").strip()
     calls = []
 
-    # Tier 1: one or more JSON objects with "name" + ("parameters"|"arguments")
-    for m in re.finditer(r'\{[^{}]*"name"\s*:\s*"[^"]+"[^{}]*\}', text, re.S):
+    # The model is inconsistent: it may wrap calls in <tool_call>…</tool_call>,
+    # emit bare JSON, or mix both in one turn. Scanning the WHOLE text for
+    # balanced {…} objects (the tags are just surrounding text) catches every
+    # form. We keep only objects that have a "name" — i.e. real tool calls.
+    for cand in _iter_balanced_objects(text):
         try:
-            obj = json.loads(m.group())
+            obj = json.loads(cand)
         except json.JSONDecodeError:
             continue
-        name = obj.get("name")
-        args = obj.get("parameters", obj.get("arguments", {}))
-        if isinstance(args, str):
-            try:
-                args = json.loads(args)
-            except json.JSONDecodeError:
-                args = {"_raw": args}
-        if name:
-            calls.append({"name": name, "arguments": args or {}})
+        call = _coerce_call(obj)
+        if call:
+            calls.append(call)
 
     if calls:
         return "", calls
 
-    # Tier 2: whole output is a JSON object/array
+    # Whole output is a bare JSON object/array of calls
     try:
         obj = json.loads(text)
-        items = obj if isinstance(obj, list) else [obj]
-        for it in items:
-            if isinstance(it, dict) and it.get("name"):
-                args = it.get("parameters", it.get("arguments", {}))
-                calls.append({"name": it["name"], "arguments": args or {}})
+        for it in (obj if isinstance(obj, list) else [obj]):
+            call = _coerce_call(it)
+            if call:
+                calls.append(call)
         if calls:
             return "", calls
     except json.JSONDecodeError:
         pass
 
-    # Tier 3: prose answer, no tool call
+    # Genuine prose, no tool call
     return text, []
 
 

@@ -36,6 +36,14 @@ models/safety_gate_multitask.pt
 *.log
 /tmp/
 
+# Runtime data / models / nested repos — never commit (large / PHI / separate repo)
+/data new/
+/model/
+/model-finetune/
+/eval-model/
+/C2-App-109/
+triage_log*.jsonl
+
 # OS
 .DS_Store
 Thumbs.db

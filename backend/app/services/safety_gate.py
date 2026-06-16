@@ -87,17 +87,44 @@ _SAFETY_SYSTEM_PROMPT = (
 )
 
 
-def _call_modal(text: str, timeout: int = 600) -> Optional[Dict]:
+# Appended to the system prompt when conversation context is supplied. Verified
+# (scripts/triage_context_experiment.py) to fix isolated-message over-triage
+# while still escalating a real, regex-evading crisis to L0.
+_CONTEXT_HINT = (
+    "\n\nYou are given the prior turns of the conversation for CONTEXT only. "
+    "Classify ONLY the latest message marked [CURRENT CLIENT MESSAGE], using "
+    "the earlier turns to understand its meaning (e.g. a client reasoning "
+    "themselves OUT of a fear is not high risk). Never downgrade genuine "
+    "suicidal intent because earlier turns were calm."
+)
+
+
+def _build_messages(text: str, history: Optional[list]) -> list:
+    """System+user messages for the safety model. With history present, prepend
+    the prior client turns and switch to the context-aware system prompt."""
+    if history:
+        convo = "\n".join(f"Client (earlier): {h}" for h in history)
+        return [
+            {"role": "system", "content": _SAFETY_SYSTEM_PROMPT + _CONTEXT_HINT},
+            {"role": "user",
+             "content": f"[CONVERSATION SO FAR]\n{convo}\n\n"
+                        f"[CURRENT CLIENT MESSAGE]\n{text}"},
+        ]
+    return [
+        {"role": "system", "content": _SAFETY_SYSTEM_PROMPT},
+        {"role": "user", "content": f"[CLIENT MESSAGE]\n{text}"},
+    ]
+
+
+def _call_modal(text: str, history: Optional[list] = None,
+                timeout: int = 600) -> Optional[Dict]:
     """Call Modal-hosted cbt-qwen2.5-7b-v2 safety endpoint. Returns None on failure."""
     url = settings.modal_safety_endpoint
     if not url:
         return None
 
     body = json.dumps({
-        "messages": [
-            {"role": "system", "content": _SAFETY_SYSTEM_PROMPT},
-            {"role": "user", "content": f"[CLIENT MESSAGE]\n{text}"},
-        ],
+        "messages": _build_messages(text, history),
         "max_new_tokens": 120,
         "temperature": 0.1,   # nearly deterministic for triage
     }).encode()
@@ -123,6 +150,8 @@ def _call_modal(text: str, timeout: int = 600) -> Optional[Dict]:
                 "reason": raw.get("reason", "QWen safety model"),
                 "source": "cbt-qwen2.5-7b-v2",
                 "latency_ms": round(latency * 1000),
+                # keep the model's structured output verbatim for the eval log
+                "raw_model": json.dumps(raw, ensure_ascii=False)[:600],
             }
 
         log.warning("Safety model unexpected response: %r", str(raw)[:200])
@@ -139,38 +168,69 @@ def _level_to_severity(level: str) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
-def assess(text: str) -> Dict:
+def _annotate(out: Dict, heuristic_level: str, model: Optional[Dict]) -> Dict:
+    """Attach shadow fields so triage_log can measure regex-vs-model
+    disagreement. Does NOT change `triage_level` — purely observational."""
+    out["heuristic_level"] = heuristic_level
+    if model is not None:
+        out["model_level"] = model["triage_level"]
+        out["model_confidence"] = model.get("confidence")
+        out["raw_model"] = model.get("raw_model")
+        # the signal we care about: did the regex and the model disagree on
+        # level? (e.g. heuristic forced L1 but the model would have said L3)
+        out["disagreement"] = (model["triage_level"] != heuristic_level)
+    else:
+        out["model_level"] = None
+        out["disagreement"] = None
+    return out
+
+
+def assess(text: str, history: Optional[list] = None) -> Dict:
     """
     Assess safety level of client message.
 
-    Priority logic (safety-first):
-        1. Heuristic L0/L1 → ALWAYS use heuristic (never override crisis)
+    `history` (optional): prior client turns of this thread, most recent last.
+    When present, the model judges the current message WITH that context, which
+    fixes isolated-message over-triage. The heuristic regex still runs on the
+    current message only, so the crisis hard-override is unaffected.
+
+    Priority logic (safety-first — UNCHANGED behavior):
+        1. Heuristic L0/L1 → ALWAYS wins (never soften a crisis classification)
         2. Modal cbt-qwen2.5-7b-v2 → for L2/L3 nuanced assessment
         3. Heuristic fallback → when Modal unavailable
+
+    On an L0/L1 hard override we OPTIONALLY still call the model in shadow mode
+    to record what it would have said. The override always stands; the shadow
+    result never changes the returned level.
     """
     # Heuristic first — crisis keywords are hard overrides
     heuristic = _heuristic(text)
-    if heuristic["triage_level"] in ("L0", "L1"):
-        log.info("Safety heuristic hard override: %s", heuristic["triage_level"])
-        return heuristic
+    hlevel = heuristic["triage_level"]
+
+    if hlevel in ("L0", "L1"):
+        log.info("Safety heuristic hard override: %s", hlevel)
+        shadow = None
+        if settings.triage_shadow_model_on_override and not settings.mock_llm:
+            # best-effort; the override stands regardless of what this returns
+            shadow = _call_modal(text, history)
+        return _annotate(dict(heuristic), hlevel, shadow)
 
     # In mock/dev mode skip the network call entirely
     if settings.mock_llm:
-        return heuristic
+        return _annotate(dict(heuristic), hlevel, None)
 
     # For L2/L3: call Modal model for nuanced assessment
-    result = _call_modal(text)
+    result = _call_modal(text, history)
     if result is not None:
         # Never let model downgrade a heuristic L2 to L3 if keywords match
-        if (heuristic["triage_level"] == "L2" and
-                result["triage_level"] == "L3"):
+        if hlevel == "L2" and result["triage_level"] == "L3":
             result["triage_level"] = "L2"
             result["severity"] = "moderate"
             result["reason"] += " (upgraded by heuristic)"
-        return result
+        return _annotate(result, hlevel, result)
 
-    log.info("Safety triage heuristic fallback: level=%s", heuristic["triage_level"])
-    return heuristic
+    log.info("Safety triage heuristic fallback: level=%s", hlevel)
+    return _annotate(dict(heuristic), hlevel, None)
 
 
 def health() -> Dict:
