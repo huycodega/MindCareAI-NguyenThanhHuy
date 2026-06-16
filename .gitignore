@@ -49,6 +49,7 @@ Thumbs.db
 
 # Claude Code ai-log transient state (the log itself, .claude/ai-log.md, is kept)
 .claude/.ai-log-state
+.claude/.ai-log-web-last.json
 
 # Alembic (giữ migrations nhưng bỏ cache)
 backend/app/__pycache__/

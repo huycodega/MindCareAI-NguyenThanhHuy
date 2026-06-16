@@ -22,3 +22,8 @@ Written by .claude/ai-stop-log.ps1 (Stop hook). Do not store secrets here.
   - ?? "data new/"
   - ?? user_app/.npm-cache/
 
+## 2026-06-16 10:40:39 +07:00
+
+- Changed files:
+  - .gitignore
+
