@@ -68,6 +68,26 @@ def _heuristic(text: str) -> Dict:
             "source": "heuristic"}
 
 
+# Passive / indirect ideation markers the L0/L1 patterns miss but the agent's
+# defense-in-depth re-check should still catch (giving away possessions, "no
+# point anymore", "done trying"). Used by agent.py, NOT by the primary gate.
+_PASSIVE_RISK_PAT = re.compile(
+    r"\b(no\s+point\s+(anymore|in\s+(living|trying|going\s+on))|"
+    r"done\s+trying|giving\s+away\s+my\s+(things|stuff|belongings|possessions)|"
+    r"better\s+off\s+without\s+me|nothing\s+(will|is\s+going\s+to)\s+get\s+better|"
+    r"tired\s+of\s+(it\s+all|living|everything|all\s+of\s+this))\b", re.I)
+
+
+def has_acute_risk(text: str) -> bool:
+    """True if the text carries acute-risk language (crisis, high-risk, or
+    passive ideation). Reusable, zero-dependency — the agent uses this as a
+    defense-in-depth re-check before letting an L2/L3 turn auto-generate."""
+    if not text:
+        return False
+    return bool(_L0_PAT.search(text) or _L1_PAT.search(text)
+                or _PASSIVE_RISK_PAT.search(text))
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Modal-hosted QWen safety model
 # ─────────────────────────────────────────────────────────────────────────────

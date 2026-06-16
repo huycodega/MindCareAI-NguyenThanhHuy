@@ -38,7 +38,7 @@ from typing import Dict, List, Optional
 from app.core.config import settings
 from app.services import (
     agent_client, retrieval, analyzer, prompt_builder, llm_client,
-    post_process, embedder, qdrant_client as qd,
+    post_process, embedder, qdrant_client as qd, metrics, safety_gate,
 )
 
 
@@ -47,6 +47,45 @@ log = logging.getLogger(__name__)
 # Terminal tools end the loop and decide the session outcome.
 _TERMINAL = {"generate_cbt_response", "ask_clarification",
              "escalate_to_clinician"}
+
+# Required arguments per tool — used to OBSERVE (not hide) whether the
+# orchestrator emits well-formed tool calls. A missing arg still runs the
+# tool (it falls back to the client message) but is recorded in the trace and
+# counted in metrics so the agent eval can report tool-arg validity.
+_REQUIRED_ARGS = {
+    "retrieve_cbt_knowledge": ["query"],
+    "recall_session_memory": ["query"],
+    "analyze_cognition": ["text"],
+    "generate_cbt_response": [],
+    "ask_clarification": ["question"],
+    "escalate_to_clinician": ["reason"],
+}
+
+
+def _missing_args(name: str, args: Dict) -> List[str]:
+    """Return the list of required args the model failed to supply."""
+    req = _REQUIRED_ARGS.get(name, [])
+    if not isinstance(args, dict):
+        return list(req)
+    return [k for k in req if not str(args.get(k) or "").strip()]
+
+
+def _risk_escalation(state: Dict, trace: List[Dict], step: int) -> Optional[Dict]:
+    """Defense-in-depth: if the client's words carry acute-risk language, return
+    an escalation result that overrides whatever non-escalate terminal the model
+    chose. Safety can only go UP. Returns None when there is no acute risk.
+    The primary safety gate already ran in chat.py; this is a second net so a
+    risky turn that slipped into the L2/L3 agent never auto-replies."""
+    if not safety_gate.has_acute_risk(state.get("user_scrubbed", "")):
+        return None
+    metrics.inc("cbt_agent_risk_recheck_total")
+    trace.append({"step": step, "tool": "escalate_to_clinician",
+                  "arguments": {"reason": "acute-risk re-check"},
+                  "note": "forced escalate (risk re-check overrode terminal)"})
+    return {"outcome": "escalate",
+            "escalate_reason": ("Safety re-check detected acute-risk language; "
+                                "routed to a clinician."),
+            "trace": trace}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -175,19 +214,28 @@ _SYSTEM_PROMPT = (
     "that when you call generate_cbt_response. Your job is to decide, step by "
     "step, how to handle a client message that has already been triaged as "
     "MODERATE (L2) or ROUTINE (L3).\n\n"
-    "Use the tools to gather evidence before responding:\n"
-    "  • analyze_cognition to detect distortions if not already known\n"
-    "  • retrieve_cbt_knowledge to ground the reply in CBT evidence\n"
-    "  • recall_session_memory for returning clients\n"
-    "Then finish with exactly ONE terminal action:\n"
-    "  • generate_cbt_response — the normal path\n"
-    "  • ask_clarification — if the message is too vague to help safely\n"
-    "  • escalate_to_clinician — if you sense risk beyond the current triage\n\n"
+    "ALWAYS respond by CALLING A TOOL, never with prose. Do not explain your "
+    "reasoning in free text — express every decision as a tool call.\n\n"
+    "Recommended procedure (follow it unless the message is too vague):\n"
+    "  1. analyze_cognition(text=<the client message>) — detect the emotion "
+    "and cognitive distortion.\n"
+    "  2. retrieve_cbt_knowledge(query=<the concern or distortion>) — pull "
+    "CBT evidence to ground the reply. This step is REQUIRED before generating.\n"
+    "  3. (optional) recall_session_memory(query=...) for a returning client.\n"
+    "  4. Finish with exactly ONE terminal action:\n"
+    "       • generate_cbt_response — the normal path, AFTER retrieving.\n"
+    "       • ask_clarification — ONLY if the message is too vague to help.\n"
+    "       • escalate_to_clinician — if you sense risk beyond the triage.\n\n"
+    "Example of a good first step for \"I always fail and everyone judges me\":\n"
+    "  call analyze_cognition with {\"text\": \"I always fail and everyone "
+    "judges me\"}\n"
+    "then call retrieve_cbt_knowledge with {\"query\": \"all-or-nothing "
+    "thinking and fear of judgement\"}, then call generate_cbt_response.\n\n"
     "Safety rules:\n"
     "  • You may only INCREASE caution. Never downplay risk.\n"
     "  • If anything hints at self-harm, hopelessness, or danger, escalate.\n"
-    "  • Prefer grounding over speed: retrieve at least once before generating "
-    "unless the client only needs clarification.\n"
+    "  • NEVER call generate_cbt_response before retrieve_cbt_knowledge has "
+    "run at least once (unless you are asking for clarification).\n"
     "Keep tool use efficient — you have a limited number of steps."
 )
 
@@ -265,6 +313,8 @@ def _ensure_grounded(state: Dict, trace: List[Dict], step: int) -> None:
     retrieved yet we auto-retrieve using the client's own message."""
     if state.get("retrieved"):
         return
+    metrics.inc("cbt_agent_forced_grounding_total")
+    state["forced_grounding"] = True
     res = _tool_retrieve({"query": state["user_scrubbed"]}, state)
     trace.append({"step": step, "tool": "retrieve_cbt_knowledge",
                   "arguments": {"query": state["user_scrubbed"][:80]},
@@ -358,6 +408,9 @@ def run_agent(*, user_scrubbed: str,
             # still produce a response; otherwise fall back entirely.
             if state["retrieved"] or state.get("analysis"):
                 log.info("Agent orchestrator dropped — forcing generate")
+                esc = _risk_escalation(state, trace, step)
+                if esc is not None:
+                    return esc
                 _ensure_grounded(state, trace, step)
                 result = _do_generate({}, state, n_responses, temperature)
                 result["trace"] = trace + [{"step": step, "tool": "_forced_generate",
@@ -370,6 +423,7 @@ def run_agent(*, user_scrubbed: str,
         if not tool_calls:
             # Model replied in prose instead of calling a tool. Nudge it once
             # toward a terminal action; record its message for context.
+            metrics.inc("cbt_agent_prose_total")
             content = (resp.get("content") or "").strip()
             messages.append({"role": "assistant", "content": content})
             messages.append({"role": "user", "content":
@@ -390,25 +444,43 @@ def run_agent(*, user_scrubbed: str,
             name = call.get("name", "")
             args = call.get("arguments") or {}
 
+            metrics.inc("cbt_agent_tool_calls_total", tool=name or "unknown")
+            missing = _missing_args(name, args)
+            if missing:
+                metrics.inc("cbt_agent_bad_args_total", tool=name or "unknown")
+
             if name == "generate_cbt_response":
+                metrics.inc("cbt_agent_terminal_total", action=name)
+                esc = _risk_escalation(state, trace, step)
+                if esc is not None:
+                    return esc
+                grounded = bool(state.get("retrieved"))
                 _ensure_grounded(state, trace, step)   # never generate ungrounded
                 result = _do_generate(args, state, n_responses, temperature)
-                trace.append({"step": step, "tool": name, "arguments": args})
+                trace.append({"step": step, "tool": name, "arguments": args,
+                              "model_grounded": grounded})
                 result["trace"] = trace
                 return result
 
             if name == "ask_clarification":
+                metrics.inc("cbt_agent_terminal_total", action=name)
+                esc = _risk_escalation(state, trace, step)
+                if esc is not None:
+                    return esc
                 q = (args.get("question") or
                      "Could you tell me a bit more about what's been "
                      "happening?").strip()
-                trace.append({"step": step, "tool": name, "arguments": args})
+                trace.append({"step": step, "tool": name, "arguments": args,
+                              "missing_args": missing})
                 return {"outcome": "needs_clarification",
                         "clarification": q, "trace": trace}
 
             if name == "escalate_to_clinician":
+                metrics.inc("cbt_agent_terminal_total", action=name)
                 reason = (args.get("reason") or
                           "Agent flagged possible elevated risk.").strip()
-                trace.append({"step": step, "tool": name, "arguments": args})
+                trace.append({"step": step, "tool": name, "arguments": args,
+                              "missing_args": missing})
                 return {"outcome": "escalate",
                         "escalate_reason": reason, "trace": trace}
 
@@ -416,6 +488,7 @@ def run_agent(*, user_scrubbed: str,
             fn = non_terminal_tools.get(name)
             if fn is None:
                 result_text = f"Unknown tool: {name}"
+                metrics.inc("cbt_agent_unknown_tool_total", tool=name or "unknown")
             else:
                 result_text = fn(args, state)
             messages.append({"role": "assistant", "content": "",
@@ -423,12 +496,16 @@ def run_agent(*, user_scrubbed: str,
             messages.append({"role": "tool", "name": name,
                              "content": result_text})
             trace.append({"step": step, "tool": name, "arguments": args,
+                          "missing_args": missing,
                           "result": result_text[:200]})
 
     # Step budget exhausted with no terminal action → force a response so the
     # client is never left hanging.
     log.info("Agent hit step budget (%d) — forcing generate",
              settings.agent_max_steps)
+    esc = _risk_escalation(state, trace, settings.agent_max_steps)
+    if esc is not None:
+        return esc
     _ensure_grounded(state, trace, settings.agent_max_steps)
     result = _do_generate({}, state, n_responses, temperature)
     result["trace"] = trace + [{"step": settings.agent_max_steps,

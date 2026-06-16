@@ -67,3 +67,7 @@ Thumbs.db
 # Alembic (giữ migrations nhưng bỏ cache)
 backend/app/__pycache__/
 backend/app/**/__pycache__/
+
+# Agent eval artifacts
+backend/agent_eval*.jsonl
+backend/_eval*.log
