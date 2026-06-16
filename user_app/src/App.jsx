@@ -115,7 +115,7 @@ function Topbar({ activePage, onNav, user, onLogout }) {
     <header className="app-topbar">
       {/* Logo (aligned to sidebar width) */}
       <div className="topbar-logo-section">
-        <div className="topbar-logo-icon">🌿</div>
+        <div className="topbar-logo-icon"><Mascot variant="wave" size={30} /></div>
         <span className="topbar-brand">MindCare AI</span>
       </div>
 
@@ -138,7 +138,10 @@ function Topbar({ activePage, onNav, user, onLogout }) {
       {/* Right: notification + user */}
       <div className="topbar-right">
         <button className="topbar-notif" title="Notifications">
-          🔔
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M6 9.5a6 6 0 1 1 12 0c0 4.5 1.8 5.5 1.8 5.5H4.2S6 14 6 9.5z" />
+            <path d="M10 19a2 2 0 0 0 4 0" />
+          </svg>
           <span className="topbar-notif-badge">3</span>
         </button>
         <div className="topbar-user-wrap">
@@ -188,12 +191,18 @@ function Sidebar({ activePage, onNav }) {
 
       {/* Bottom companion card */}
       <div className="sidebar-companion-card">
-        <div className="sidebar-companion-title">MindCare AI<br />is always by your side</div>
+        <div className="sidebar-companion-title">You are not alone</div>
         <div className="sidebar-companion-text">
-          You are not alone. We are here to listen and support you anytime.
+          MindCare AI is always here to listen and accompany you.
         </div>
         <div className="sidebar-companion-mascot">
-          <Mascot variant="concerned" size={120} />
+          <svg className="sidebar-plant" width="70" height="70" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <path d="M20 60h24l-2-12H22z" fill="#E4F0EC" stroke="#7FB8A6" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M32 48V30" stroke="#3F9E78" strokeWidth="2.4" strokeLinecap="round" />
+            <path d="M32 34c-8 0-13-5-13-13 8 0 13 5 13 13z" fill="#9FE0C4" stroke="#3F9E78" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M32 30c8 0 13-5 13-13-8 0-13 5-13 13z" fill="#BDEBD6" stroke="#3F9E78" strokeWidth="2" strokeLinejoin="round" />
+            <path d="M32 40c-5-1-8-4-9-9 5 1 8 4 9 9z" fill="#9FE0C4" stroke="#3F9E78" strokeWidth="2" strokeLinejoin="round" />
+          </svg>
         </div>
       </div>
     </nav>

@@ -5425,3 +5425,39 @@ h1.title { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin-bo
   width: 20px;
   height: 20px;
 }
+
+/* ── Home dashboard — spec refinements ─────────────────────────── */
+.home-dashboard-v3 .btn-hero-primary,
+.home-dashboard-v3 .btn-hero-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.home-dashboard-v3 .btn-hero-primary svg,
+.home-dashboard-v3 .btn-hero-ghost svg { flex-shrink: 0; }
+
+/* Today's Tip lightbulb icon */
+.home-dashboard-v3 .side-title { display: flex; align-items: center; gap: 6px; }
+.side-title-icon { display: inline-flex; align-items: center; color: #E8920C; }
+
+/* Large "Medium" risk status on the screening card */
+.home-dashboard-v3 .risk-pill-lg {
+  font-size: 20px;
+  padding: 7px 16px;
+  margin-top: 2px;
+}
+.home-dashboard-v3 .side-risk-label { margin-bottom: 6px; }
+
+/* Activity rows: keep status vertically centered on the right */
+.home-side-card .activity-row { align-items: center; }
+
+/* Footer note */
+.dash-footer {
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+  margin-top: 8px;
+  padding-top: 16px;
+}
