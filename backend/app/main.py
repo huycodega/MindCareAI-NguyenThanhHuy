@@ -21,6 +21,7 @@ from app.api.admin import router as admin_router
 from app.api.admin_users import router as admin_users_router
 from app.api.conversations import router as conversations_router
 from app.api.screening import router as screening_router
+from app.api.content import router as content_router
 from app.core import auth as auth_core
 from app.core.config import settings
 from app.db import models
@@ -44,6 +45,7 @@ app.include_router(admin_router)
 app.include_router(admin_users_router)
 app.include_router(conversations_router)
 app.include_router(screening_router)
+app.include_router(content_router)
 
 
 @app.on_event("startup")
@@ -93,6 +95,14 @@ def boot():
         log.info("Seed users ready")
     except Exception as e:
         log.warning("User seed skipped: %s — run `alembic upgrade head`?", e)
+    # Seed learning content (lessons + resources, idempotent)
+    try:
+        from app.db.seed_content import seed_content
+        with db_session() as s:
+            seed_content(s)
+        log.info("Seed content ready")
+    except Exception as e:
+        log.warning("Content seed skipped: %s — run `alembic upgrade head`?", e)
 
 
 @app.get("/api/health")

@@ -75,4 +75,22 @@ export const api = {
 
   // --- crisis oversight ---
   crisis: (windowDays = 30) => req(`/admin/crisis?window_days=${windowDays}`),
+
+  // --- lessons (LessonsAdmin) ---
+  lessons: () => req("/admin/lessons"),
+  createLesson: (payload) =>
+    req("/admin/lessons", { method: "POST", body: payload }),
+  updateLesson: (lid, payload) =>
+    req(`/admin/lessons/${lid}`, { method: "PATCH", body: payload }),
+  deleteLesson: (lid) =>
+    req(`/admin/lessons/${lid}`, { method: "DELETE" }),
+
+  // --- resources (ResourcesAdmin) ---
+  resources: () => req("/admin/resources"),
+  createResource: (payload) =>
+    req("/admin/resources", { method: "POST", body: payload }),
+  updateResource: (rid, payload) =>
+    req(`/admin/resources/${rid}`, { method: "PATCH", body: payload }),
+  deleteResource: (rid) =>
+    req(`/admin/resources/${rid}`, { method: "DELETE" }),
 };

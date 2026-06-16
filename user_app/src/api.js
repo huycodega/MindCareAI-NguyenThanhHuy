@@ -83,4 +83,20 @@ export const api = {
   screeningHistory: (limit = 20) =>
     req(`/screening/history?limit=${limit}`),
   latestScreening: () => req("/screening/latest"),
+
+  // ---- learning content (BaiHoc / TaiNguyen) ----
+  lessons: (params = {}) => {
+    const q = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== "" && v != null)
+    ).toString();
+    return req(`/lessons${q ? `?${q}` : ""}`);
+  },
+  lesson: (lid) => req(`/lessons/${lid}`),
+  resources: (params = {}) => {
+    const q = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== "" && v != null)
+    ).toString();
+    return req(`/resources${q ? `?${q}` : ""}`);
+  },
+  resource: (rid) => req(`/resources/${rid}`),
 };

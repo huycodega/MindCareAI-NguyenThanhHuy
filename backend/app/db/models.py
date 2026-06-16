@@ -336,3 +336,81 @@ class Screening(Base):
 
 
 Index("idx_screenings_user", Screening.user_id, Screening.created_at.desc())
+
+
+# ============================================================
+# learning content  (public CBT lessons — admin-managed, user-facing)
+# ============================================================
+class Lesson(Base):
+    """A CBT micro-lesson shown to users in the Lessons (BaiHoc) page and
+    managed by admins in LessonsAdmin. NOT PHI — public educational content,
+    so columns are plain text (no encryption)."""
+    __tablename__ = "lessons"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    category: Mapped[Optional[str]] = mapped_column(String)
+    # basic | intermediate | advanced
+    level: Mapped[str] = mapped_column(String, nullable=False, default="basic")
+    duration: Mapped[Optional[str]] = mapped_column(String)   # e.g. "15 min"
+    content: Mapped[Optional[str]] = mapped_column(Text)       # lesson body
+    objectives: Mapped[Optional[list]] = mapped_column(JSONB)  # ["...", ...]
+    tags: Mapped[Optional[list]] = mapped_column(JSONB)        # ["stress", ...]
+    # draft | published
+    status: Mapped[str] = mapped_column(String, nullable=False, default="draft")
+    author: Mapped[Optional[str]] = mapped_column(String)      # display name
+    views: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = _now()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint("level IN ('basic','intermediate','advanced')",
+                        name="lessons_level_check"),
+        CheckConstraint("status IN ('draft','published')",
+                        name="lessons_status_check"),
+    )
+
+
+Index("idx_lessons_status", Lesson.status, Lesson.created_at.desc())
+
+
+# ============================================================
+# support resources  (audio / article / video / CBT tool)
+# ============================================================
+class Resource(Base):
+    """A support resource (audio, article, video, CBT tool) shown to users in
+    the Resources (TaiNguyen) page and managed by admins in ResourcesAdmin.
+    NOT PHI — public content."""
+    __tablename__ = "resources"
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    # Audio | Article | Video | CBT Tool
+    type: Mapped[str] = mapped_column(String, nullable=False, default="Article")
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text)
+    category: Mapped[Optional[str]] = mapped_column(String)
+    duration: Mapped[Optional[str]] = mapped_column(String)   # "05:23" or ""
+    url: Mapped[Optional[str]] = mapped_column(String)        # external link
+    content: Mapped[Optional[str]] = mapped_column(Text)      # inline body
+    # published | urgent | update
+    status: Mapped[str] = mapped_column(String, nullable=False,
+                                        default="published")
+    urgent: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    owner: Mapped[Optional[str]] = mapped_column(String)      # display name
+    tags: Mapped[Optional[list]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = _now()
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "type IN ('Audio','Article','Video','CBT Tool')",
+            name="resources_type_check"),
+        CheckConstraint(
+            "status IN ('published','urgent','update','draft')",
+            name="resources_status_check"),
+    )
+
+
+Index("idx_resources_status", Resource.status, Resource.created_at.desc())
+Index("idx_resources_type", Resource.type)

@@ -1,7 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "../admin/Icon.jsx";
 import Sidebar from "../admin/Sidebar.jsx";
 import TopBar from "../admin/TopBar.jsx";
+import { api } from "../api.js";
+
+/* Thumb art is keyed 1..8; map any row to one by its position so DB-backed
+   rows (UUID ids) still get a stable icon. */
+function thumbFor(idx) { return THUMBS[(idx % 8) + 1]; }
 
 /* ── Stat card ─────────────────────────────────────────────────── */
 function StatCard({ icon, tone, label, value, sub, trend }) {
@@ -79,7 +84,7 @@ const POPULAR = [
 ];
 
 /* ── Filter bar ────────────────────────────────────────────────── */
-function FilterBar() {
+function FilterBar({ onAdd }) {
   return (
     <div className="la-filterbar">
       <div className="la-filter-search">
@@ -99,15 +104,23 @@ function FilterBar() {
         <select className="la-select"><option>All</option></select>
       </div>
       <button className="la-btn-ghost"><Icon name="sort" size={16} /> Sort: Newest</button>
-      <button className="la-btn-primary"><Icon name="plus" size={16} /> Add Lesson</button>
+      <button className="la-btn-primary" onClick={onAdd}><Icon name="plus" size={16} /> Add Lesson</button>
     </div>
   );
 }
 
 /* ── Lesson row ────────────────────────────────────────────────── */
-function LessonRow({ lesson, selected, onSelect }) {
-  const [emoji, bg] = THUMBS[lesson.id];
-  const [user, time] = [lesson.by, lesson.date];
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString("en-GB") + " " +
+    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+function LessonRow({ lesson, idx, selected, onSelect, onDelete }) {
+  const [emoji, bg] = thumbFor(idx);
+  const [user, time] = [lesson.author || "—", fmtDate(lesson.updated_at)];
   const isDraft = lesson.status === "draft";
   return (
     <tr className={selected ? "selected" : ""} onClick={() => onSelect(lesson.id)}>
@@ -129,8 +142,8 @@ function LessonRow({ lesson, selected, onSelect }) {
       </td>
       <td onClick={(e) => e.stopPropagation()}>
         <div className="la-actions">
-          <button className="la-act" title={isDraft ? "Edit" : "View"}><Icon name={isDraft ? "pencil" : "eye"} size={17} /></button>
-          <button className="la-act" title="More"><Icon name="dots" size={17} /></button>
+          <button className="la-act" title={isDraft ? "Edit" : "View"} onClick={() => onSelect(lesson.id)}><Icon name={isDraft ? "pencil" : "eye"} size={17} /></button>
+          <button className="la-act" title="Delete" onClick={() => onDelete(lesson)}><Icon name="close" size={17} /></button>
         </div>
       </td>
     </tr>
@@ -193,14 +206,17 @@ function MiniLineChart() {
 }
 
 /* ── Detail panel ──────────────────────────────────────────────── */
-const OBJECTIVES = [
+const OBJECTIVES_FALLBACK = [
   "Understand the causes and signs of stress",
   "Apply simple relaxation techniques",
   "Build a personal stress management plan",
 ];
-const TAGS = ["stress", "relaxation", "emotion control", "+2"];
 
-function DetailPanel({ lesson }) {
+function DetailPanel({ lesson, onTogglePublish, onEdit }) {
+  const objectives = (lesson.objectives && lesson.objectives.length)
+    ? lesson.objectives : OBJECTIVES_FALLBACK;
+  const tags = lesson.tags && lesson.tags.length ? lesson.tags : [];
+  const isPub = lesson.status === "published";
   return (
     <aside className="la-detail">
       <div className="la-card">
@@ -213,13 +229,12 @@ function DetailPanel({ lesson }) {
           <StatusBadge status={lesson.status} />
         </div>
         <p className="la-detail-desc">
-          Understand the root causes of stress and apply simple techniques to manage emotions
-          and stay calm in daily life.
+          {lesson.description || "No description provided."}
         </p>
 
         <div className="la-detail-section">
           <div className="la-detail-h">Learning Objectives</div>
-          {OBJECTIVES.map((o) => (
+          {objectives.map((o) => (
             <div key={o} className="la-objective"><span className="la-obj-tick"><Icon name="check" size={12} stroke={2.4} /></span>{o}</div>
           ))}
         </div>
@@ -228,13 +243,13 @@ function DetailPanel({ lesson }) {
           <div className="la-detail-h">Category &amp; Tags</div>
           <span className="la-cat la-cat-indigo" style={{ marginBottom: 8, display: "inline-block" }}>{lesson.category}</span>
           <div className="la-tags">
-            {TAGS.map((t) => <span key={t} className="la-tag">{t}</span>)}
+            {tags.map((t) => <span key={t} className="la-tag">{t}</span>)}
           </div>
         </div>
 
         <div className="la-detail-actions">
-          <button className="la-btn-primary la-btn-grow"><Icon name="pencil" size={15} /> Edit</button>
-          <button className="la-btn-green la-btn-grow"><Icon name="publish" size={15} /> Publish</button>
+          <button className="la-btn-primary la-btn-grow" onClick={() => onEdit(lesson)}><Icon name="pencil" size={15} /> Edit</button>
+          <button className="la-btn-green la-btn-grow" onClick={() => onTogglePublish(lesson)}><Icon name="publish" size={15} /> {isPub ? "Unpublish" : "Publish"}</button>
         </div>
         <button className="la-btn-outline la-btn-full"><Icon name="eye" size={16} /> Preview</button>
       </div>
@@ -269,8 +284,65 @@ function DetailPanel({ lesson }) {
 
 /* ── Page ──────────────────────────────────────────────────────── */
 export default function LessonsAdmin({ onLogout, onNav }) {
-  const [selected, setSelected] = useState(1);
-  const selectedLesson = LESSONS.find((l) => l.id === selected) || LESSONS[0];
+  const [lessons, setLessons] = useState([]);
+  const [stats, setStats] = useState({ total: 0, published: 0, draft: 0, views: 0 });
+  const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+
+  async function load() {
+    setLoading(true);
+    try {
+      const r = await api.lessons();
+      setLessons(r.lessons || []);
+      setStats(r.stats || { total: 0, published: 0, draft: 0, views: 0 });
+      setSelected((prev) =>
+        prev && (r.lessons || []).some((l) => l.id === prev)
+          ? prev : (r.lessons?.[0]?.id ?? null));
+      setErr("");
+    } catch (e) {
+      setErr(e.message || "Failed to load lessons");
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function handleAdd() {
+    const title = window.prompt("New lesson title:");
+    if (!title) return;
+    try {
+      await api.createLesson({ title, status: "draft" });
+      await load();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleDelete(lesson) {
+    if (!window.confirm(`Delete lesson "${lesson.title}"?`)) return;
+    try {
+      await api.deleteLesson(lesson.id);
+      await load();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleTogglePublish(lesson) {
+    const status = lesson.status === "published" ? "draft" : "published";
+    try {
+      await api.updateLesson(lesson.id, { status });
+      await load();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleEdit(lesson) {
+    const title = window.prompt("Edit title:", lesson.title);
+    if (title == null) return;
+    try {
+      await api.updateLesson(lesson.id, { title });
+      await load();
+    } catch (e) { alert(e.message); }
+  }
+
+  const selectedLesson = lessons.find((l) => l.id === selected) || lessons[0] || null;
 
   return (
     <div className="la-shell">
@@ -279,7 +351,7 @@ export default function LessonsAdmin({ onLogout, onNav }) {
       <div className="la-main">
         <TopBar
           title="CBT Lessons Management"
-          subtitle="Updated 14/06/2024 · 09:24"
+          subtitle={loading ? "Loading…" : `${stats.total} lessons`}
           searchPlaceholder="Search lessons, categories, tags..."
           onLogout={onLogout}
         />
@@ -288,15 +360,16 @@ export default function LessonsAdmin({ onLogout, onNav }) {
           <div className="la-content-left">
             {/* Stat cards */}
             <div className="la-stats">
-              <StatCard icon="book" tone="indigo" label="Total Lessons" value="48" sub="12% vs last month" trend />
-              <StatCard icon="checkCircle" tone="green" label="Active" value="36" sub="75% of all lessons" />
-              <StatCard icon="file" tone="orange" label="Drafts" value="8" sub="17% of all lessons" />
-              <StatCard icon="clock" tone="red" label="Avg. Completion Rate" value="63%" sub="8% vs last month" trend />
+              <StatCard icon="book" tone="indigo" label="Total Lessons" value={String(stats.total)} sub="all lessons" />
+              <StatCard icon="checkCircle" tone="green" label="Published" value={String(stats.published)} sub="visible to users" />
+              <StatCard icon="file" tone="orange" label="Drafts" value={String(stats.draft)} sub="not yet published" />
+              <StatCard icon="clock" tone="red" label="Total Views" value={String(stats.views)} sub="across all lessons" />
             </div>
 
             {/* Table card */}
             <div className="la-card la-table-card">
-              <FilterBar />
+              <FilterBar onAdd={handleAdd} />
+              {err && <div className="la-empty" style={{ color: "#ef4444", padding: 16 }}>{err}</div>}
               <div className="la-table-wrap">
                 <table className="la-table">
                   <thead>
@@ -306,9 +379,12 @@ export default function LessonsAdmin({ onLogout, onNav }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {LESSONS.map((l) => (
-                      <LessonRow key={l.id} lesson={l} selected={l.id === selected} onSelect={setSelected} />
+                    {lessons.map((l, i) => (
+                      <LessonRow key={l.id} lesson={l} idx={i} selected={l.id === selected} onSelect={setSelected} onDelete={handleDelete} />
                     ))}
+                    {!loading && lessons.length === 0 && (
+                      <tr><td colSpan={7} style={{ textAlign: "center", padding: 24, color: "#94a3b8" }}>No lessons yet.</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -316,7 +392,9 @@ export default function LessonsAdmin({ onLogout, onNav }) {
             </div>
           </div>
 
-          <DetailPanel lesson={selectedLesson} />
+          {selectedLesson && (
+            <DetailPanel lesson={selectedLesson} onTogglePublish={handleTogglePublish} onEdit={handleEdit} />
+          )}
         </div>
       </div>
     </div>

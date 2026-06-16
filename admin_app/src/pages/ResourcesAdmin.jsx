@@ -1,7 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Icon from "../admin/Icon.jsx";
 import Sidebar from "../admin/Sidebar.jsx";
 import TopBar from "../admin/TopBar.jsx";
+import { api } from "../api.js";
+
+/* Thumb art is keyed 1..8; map any row to one by position so DB-backed rows
+   (UUID ids) still render a stable icon. */
+function thumbFor(idx) { return THUMBS[(idx % 8) + 1] || THUMBS[1]; }
 
 /* ── Stat card ─────────────────────────────────────────────────── */
 function StatCard({ icon, tone, label, value, sub, trend }) {
@@ -117,8 +122,8 @@ const RESOURCES = [
 const TYPE_TO_TAB = { Audio: "audio", Article: "articles", Video: "video", "CBT Tool": "tools" };
 
 /* ── Resource row ──────────────────────────────────────────────── */
-function ResourceRow({ r, idx, selected, onSelect }) {
-  const [emoji, bg] = THUMBS[r.id];
+function ResourceRow({ r, idx, selected, onSelect, onDelete }) {
+  const [emoji, bg] = thumbFor(idx);
   return (
     <tr className={selected ? (r.urgent ? "row-urgent-selected" : "selected") : ""} onClick={() => onSelect(r.id)}>
       <td onClick={(e) => e.stopPropagation()} className="la-check-cell">
@@ -142,7 +147,7 @@ function ResourceRow({ r, idx, selected, onSelect }) {
       <td><StatusBadge status={r.status} /></td>
       <td><Owner name={r.owner} idx={idx} /></td>
       <td onClick={(e) => e.stopPropagation()}>
-        <div className="la-actions"><button className="la-act" title="More"><Icon name="dots" size={17} /></button></div>
+        <div className="la-actions"><button className="la-act" title="Delete" onClick={() => onDelete(r)}><Icon name="close" size={17} /></button></div>
       </td>
     </tr>
   );
@@ -178,61 +183,76 @@ const INFO = [
   ["Last Updated", "13/06/2024 09:18"],
 ];
 
-function DetailPanel({ resource, onClose }) {
+function fmtDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString("en-GB") + " " +
+    d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+}
+
+function DetailPanel({ resource, onClose, onEdit, onTogglePublish }) {
+  const tags = resource.tags && resource.tags.length ? resource.tags : [];
+  const isPub = resource.status === "published";
+  const owner = resource.owner || "—";
+  const oi = owner.trim().split(/\s+/);
+  const initials = ((oi[0]?.[0] || "") + (oi[oi.length - 1]?.[0] || "")).toUpperCase();
   return (
     <aside className="la-detail la-detail-single">
       <div className="la-card la-detail-card">
         <button className="la-close" onClick={onClose} aria-label="Close"><Icon name="close" size={18} /></button>
 
-        <div className="la-hotline-banner">
-          <span className="la-hotline-circle"><Icon name="phone" size={22} /></span>
-          <div>
-            <div className="la-hotline-label">24/7 SUPPORT HOTLINE</div>
-            <div className="la-hotline-num">0169 234 5678</div>
+        {resource.urgent && (
+          <div className="la-hotline-banner">
+            <span className="la-hotline-circle"><Icon name="phone" size={22} /></span>
+            <div>
+              <div className="la-hotline-label">24/7 SUPPORT HOTLINE</div>
+              <div className="la-hotline-num">0169 234 5678</div>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="la-detail-titlerow">
           <h3>{resource.title}</h3>
-          <span className="la-badge la-badge-red"><span className="la-badge-dot" />Urgent</span>
+          {resource.urgent
+            ? <span className="la-badge la-badge-red"><span className="la-badge-dot" />Urgent</span>
+            : <span className="la-badge la-badge-green"><span className="la-badge-dot" />{resource.status}</span>}
         </div>
-        <div className="la-detail-meta">Article • Emergency Support</div>
-        <p className="la-detail-desc">
-          24/7 contact information for emergency situations related to mental and emotional health.
-        </p>
+        <div className="la-detail-meta">{resource.type} • {resource.category || "—"}</div>
+        <p className="la-detail-desc">{resource.description || "No description provided."}</p>
 
         <div className="la-info">
-          {INFO.map(([k, v]) => (
-            <div key={k} className="la-info-row"><span className="la-info-label">{k}</span><span className="la-info-value">{v}</span></div>
-          ))}
+          <div className="la-info-row"><span className="la-info-label">Resource ID</span><span className="la-info-value">{resource.id.slice(0, 8)}</span></div>
+          <div className="la-info-row"><span className="la-info-label">Created</span><span className="la-info-value">{fmtDate(resource.created_at)}</span></div>
+          <div className="la-info-row"><span className="la-info-label">Last Updated</span><span className="la-info-value">{fmtDate(resource.updated_at)}</span></div>
           <div className="la-info-row">
             <span className="la-info-label">Owner</span>
             <span className="la-info-value la-info-owner">
-              <span className="la-owner-avatar" style={{ background: "#ef4444" }}>PB</span>Phạm Gia Bảo
+              <span className="la-owner-avatar" style={{ background: "#6366f1" }}>{initials}</span>{owner}
             </span>
           </div>
         </div>
 
         <div className="la-detail-section">
           <div className="la-detail-h">Tags</div>
-          <div className="la-tags">{TAGS.map((t) => <span key={t} className="la-tag">{t}</span>)}</div>
+          <div className="la-tags">{tags.map((t) => <span key={t} className="la-tag">{t}</span>)}</div>
         </div>
 
         <div className="la-detail-section">
-          <div className="la-detail-h">Usage Count</div>
+          <div className="la-detail-h">Type</div>
           <div className="la-usage">
-            <span className="la-usage-icon"><Icon name="users" size={20} /></span>
+            <span className="la-usage-icon"><Icon name="folder" size={20} /></span>
             <div>
-              <div className="la-usage-num">1,248</div>
-              <div className="la-usage-trend"><Icon name="arrowUp" size={12} /> 15% vs last month</div>
+              <div className="la-usage-num">{resource.type}</div>
+              <div className="la-usage-trend">{resource.duration || "—"}</div>
             </div>
           </div>
         </div>
 
         <div className="la-detail-foot">
-          <button className="la-btn-outline la-btn-grow"><Icon name="pencil" size={15} /> Edit</button>
-          <button className="la-icon-btn-sm"><Icon name="link" size={16} /></button>
-          <button className="la-btn-green la-btn-grow"><Icon name="publish" size={15} /> Publish</button>
+          <button className="la-btn-outline la-btn-grow" onClick={() => onEdit(resource)}><Icon name="pencil" size={15} /> Edit</button>
+          {resource.url && <a className="la-icon-btn-sm" href={resource.url} target="_blank" rel="noreferrer"><Icon name="link" size={16} /></a>}
+          <button className="la-btn-green la-btn-grow" onClick={() => onTogglePublish(resource)}><Icon name="publish" size={15} /> {isPub ? "Unpublish" : "Publish"}</button>
         </div>
       </div>
     </aside>
@@ -242,14 +262,72 @@ function DetailPanel({ resource, onClose }) {
 /* ── Page ──────────────────────────────────────────────────────── */
 export default function ResourcesAdmin({ onLogout, onNav }) {
   const [tab, setTab] = useState("all");
-  const [selected, setSelected] = useState(4);
+  const [resources, setResources] = useState([]);
+  const [stats, setStats] = useState({ total: 0, urgent: 0, by_type: {} });
+  const [selected, setSelected] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
 
-  const filtered = RESOURCES.filter((r) => {
+  async function load() {
+    setLoading(true);
+    try {
+      const r = await api.resources();
+      setResources(r.resources || []);
+      setStats(r.stats || { total: 0, urgent: 0, by_type: {} });
+      setErr("");
+    } catch (e) {
+      setErr(e.message || "Failed to load resources");
+    } finally {
+      setLoading(false);
+    }
+  }
+  useEffect(() => { load(); }, []);
+
+  async function handleAdd() {
+    const title = window.prompt("New resource title:");
+    if (!title) return;
+    const type = window.prompt("Type (Audio / Article / Video / CBT Tool):", "Article") || "Article";
+    try {
+      await api.createResource({ title, type, status: "published" });
+      await load();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleDelete(r) {
+    if (!window.confirm(`Delete resource "${r.title}"?`)) return;
+    try {
+      await api.deleteResource(r.id);
+      if (selected === r.id) setSelected(null);
+      await load();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleEdit(r) {
+    const title = window.prompt("Edit title:", r.title);
+    if (title == null) return;
+    try {
+      await api.updateResource(r.id, { title });
+      await load();
+    } catch (e) { alert(e.message); }
+  }
+
+  async function handleTogglePublish(r) {
+    const status = r.status === "published" ? "draft" : "published";
+    try {
+      await api.updateResource(r.id, { status });
+      await load();
+    } catch (e) { alert(e.message); }
+  }
+
+  const published = stats.total - (resources.filter((r) => r.status === "draft").length);
+  const needsUpdate = resources.filter((r) => r.status === "update").length;
+
+  const filtered = resources.filter((r) => {
     if (tab === "all") return true;
-    if (tab === "urgent") return r.status === "urgent";
+    if (tab === "urgent") return r.urgent || r.status === "urgent";
     return TYPE_TO_TAB[r.type] === tab;
   });
-  const selectedResource = RESOURCES.find((r) => r.id === selected);
+  const selectedResource = resources.find((r) => r.id === selected);
   const panelOpen = !!selectedResource;
 
   return (
@@ -259,7 +337,7 @@ export default function ResourcesAdmin({ onLogout, onNav }) {
       <div className="la-main">
         <TopBar
           title="Resource Management"
-          subtitle="Updated 14/06/2024 · 09:24"
+          subtitle={loading ? "Loading…" : `${stats.total} resources`}
           searchPlaceholder="Search resources, categories, owners..."
           onLogout={onLogout}
         />
@@ -268,10 +346,10 @@ export default function ResourcesAdmin({ onLogout, onNav }) {
           <div className="la-content-left">
             {/* Stat cards */}
             <div className="la-stats">
-              <StatCard icon="book" tone="indigo" label="Total Resources" value="326" sub="18 new resources" trend />
-              <StatCard icon="alert" tone="red" label="Urgent" value="12" sub="3 resources" trend />
-              <StatCard icon="checkCircle" tone="green" label="Published" value="286" sub="87.7% of all resources" />
-              <StatCard icon="clock" tone="orange" label="Needs Update" value="28" sub="8.6% of all resources" />
+              <StatCard icon="book" tone="indigo" label="Total Resources" value={String(stats.total)} sub="all resources" />
+              <StatCard icon="alert" tone="red" label="Urgent" value={String(stats.urgent)} sub="need attention" />
+              <StatCard icon="checkCircle" tone="green" label="Published" value={String(published)} sub="visible to users" />
+              <StatCard icon="clock" tone="orange" label="Needs Update" value={String(needsUpdate)} sub="flagged for review" />
             </div>
 
             {/* Table card */}
@@ -286,9 +364,10 @@ export default function ResourcesAdmin({ onLogout, onNav }) {
                   <label>Category</label>
                   <select className="la-select"><option>All</option></select>
                 </div>
-                <button className="la-btn-primary"><Icon name="plus" size={16} /> Add Resource</button>
+                <button className="la-btn-primary" onClick={handleAdd}><Icon name="plus" size={16} /> Add Resource</button>
               </div>
 
+              {err && <div style={{ color: "#ef4444", padding: 16 }}>{err}</div>}
               <div className="la-table-wrap">
                 <table className="la-table">
                   <thead>
@@ -300,8 +379,11 @@ export default function ResourcesAdmin({ onLogout, onNav }) {
                   </thead>
                   <tbody>
                     {filtered.map((r, i) => (
-                      <ResourceRow key={r.id} r={r} idx={i} selected={r.id === selected} onSelect={setSelected} />
+                      <ResourceRow key={r.id} r={r} idx={i} selected={r.id === selected} onSelect={setSelected} onDelete={handleDelete} />
                     ))}
+                    {!loading && filtered.length === 0 && (
+                      <tr><td colSpan={8} style={{ textAlign: "center", padding: 24, color: "#94a3b8" }}>No resources.</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -310,7 +392,7 @@ export default function ResourcesAdmin({ onLogout, onNav }) {
             </div>
           </div>
 
-          {panelOpen && <DetailPanel resource={selectedResource} onClose={() => setSelected(null)} />}
+          {panelOpen && <DetailPanel resource={selectedResource} onClose={() => setSelected(null)} onEdit={handleEdit} onTogglePublish={handleTogglePublish} />}
         </div>
       </div>
     </div>

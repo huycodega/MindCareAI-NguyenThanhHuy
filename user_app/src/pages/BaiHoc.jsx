@@ -1,5 +1,24 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Mascot from "../components/Mascot.jsx";
+import { api } from "../api.js";
+
+/* Map a DB lesson category → the card's filter bucket, art + accent so
+   DB-backed lessons render with the same illustrated style as the mockup. */
+const CAT_STYLE = {
+  "Stress Management":      { cat: "emotion",  art: "smiley", accent: "green" },
+  "Positive Thinking":      { cat: "thinking", art: "brain",  accent: "indigo" },
+  "Mindfulness":            { cat: "mindful",  art: "lotus",  accent: "purple" },
+  "Breathing & Relaxation": { cat: "relax",    art: "wind",   accent: "teal" },
+  "Habits":                 { cat: "habit",    art: "target", accent: "pink" },
+  "Social Skills":          { cat: "thinking", art: "cloud",  accent: "orange" },
+  "Mental Wellness":        { cat: "mindful",  art: "lotus",  accent: "teal" },
+};
+const ACCENT_CYCLE = ["green", "indigo", "purple", "teal", "orange", "pink"];
+const ART_CYCLE = ["smiley", "brain", "lotus", "wind", "cloud", "target"];
+function styleFor(lesson, i) {
+  const s = CAT_STYLE[lesson.category];
+  return s || { cat: "all", art: ART_CYCLE[i % 6], accent: ACCENT_CYCLE[i % 6] };
+}
 
 /* ── Filter chips (match mockup) ───────────────────────────────── */
 const FILTERS = [
@@ -149,8 +168,28 @@ function JourneyArt() {
 
 export default function BaiHoc() {
   const [active, setActive] = useState("all");
+  const [lessons, setLessons] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = active === "all" ? TOPICS : TOPICS.filter((t) => t.cat === active);
+  useEffect(() => {
+    let alive = true;
+    api.lessons()
+      .then((r) => { if (alive) setLessons(r.lessons || []); })
+      .catch(() => { if (alive) setLessons([]); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
+  // Map DB lessons → card shape, keeping the illustrated style.
+  const cards = lessons.map((l, i) => {
+    const s = styleFor(l, i);
+    return {
+      n: i + 1, id: l.id, accent: s.accent, cat: s.cat, art: s.art,
+      title: l.title, desc: l.description || "",
+      time: l.duration || "—", progress: 0,
+    };
+  });
+  const filtered = active === "all" ? cards : cards.filter((t) => t.cat === active);
 
   return (
     <div className="bh-layout">
@@ -209,6 +248,11 @@ export default function BaiHoc() {
 
         {/* Topic section */}
         <h3 className="bh-section-title">Lessons by Topic</h3>
+
+        {loading && <p className="bh-subtitle">Loading lessons…</p>}
+        {!loading && cards.length === 0 && (
+          <p className="bh-subtitle">No lessons available yet. Check back soon.</p>
+        )}
 
         <div className="bh-grid">
           {filtered.map((t) => {

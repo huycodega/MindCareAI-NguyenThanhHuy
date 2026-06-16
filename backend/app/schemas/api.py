@@ -70,3 +70,66 @@ class UserStatusIn(BaseModel):
 
 class UserRoleIn(BaseModel):
     role: str = Field(pattern="^(user|clinician|admin)$")
+
+
+# ---- learning content: lessons ----
+class LessonIn(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    description: str = ""
+    category: str = ""
+    level: str = Field(default="basic",
+                       pattern="^(basic|intermediate|advanced)$")
+    duration: str = ""
+    content: str = ""
+    objectives: List[str] = []
+    tags: List[str] = []
+    status: str = Field(default="draft", pattern="^(draft|published)$")
+    author: str = ""
+
+
+class LessonUpdateIn(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=200)
+    description: Optional[str] = None
+    category: Optional[str] = None
+    level: Optional[str] = Field(default=None,
+                                 pattern="^(basic|intermediate|advanced)$")
+    duration: Optional[str] = None
+    content: Optional[str] = None
+    objectives: Optional[List[str]] = None
+    tags: Optional[List[str]] = None
+    status: Optional[str] = Field(default=None,
+                                  pattern="^(draft|published)$")
+    author: Optional[str] = None
+
+
+# ---- learning content: support resources ----
+class ResourceIn(BaseModel):
+    type: str = Field(default="Article",
+                      pattern="^(Audio|Article|Video|CBT Tool)$")
+    title: str = Field(min_length=1, max_length=200)
+    description: str = ""
+    category: str = ""
+    duration: str = ""
+    url: str = ""
+    content: str = ""
+    status: str = Field(default="published",
+                        pattern="^(published|urgent|update|draft)$")
+    urgent: bool = False
+    owner: str = ""
+    tags: List[str] = []
+
+
+class ResourceUpdateIn(BaseModel):
+    type: Optional[str] = Field(default=None,
+                                pattern="^(Audio|Article|Video|CBT Tool)$")
+    title: Optional[str] = Field(default=None, max_length=200)
+    description: Optional[str] = None
+    category: Optional[str] = None
+    duration: Optional[str] = None
+    url: Optional[str] = None
+    content: Optional[str] = None
+    status: Optional[str] = Field(default=None,
+                                  pattern="^(published|urgent|update|draft)$")
+    urgent: Optional[bool] = None
+    owner: Optional[str] = None
+    tags: Optional[List[str]] = None

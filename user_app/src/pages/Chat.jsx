@@ -59,18 +59,33 @@ const QUICK_REPLIES = [
 ];
 
 /* ── Seed conversation (matches mockup) ────────────────────────── */
-const SEED = [
-  { role: "ai", time: "09:30",
-    text: "Hi Minh! 👋\nI'm MindCare AI, here to listen and be with you. What would you like to share today?" },
-  { role: "user", time: "09:31", read: true,
-    text: "Lately I've been worrying about the future, and I'm not sure if I'm heading in the right direction." },
-  { role: "ai", time: "09:33",
-    text: "Thank you for sharing this with me. 🤗\nWorrying about the future is completely normal, especially when we're facing many choices or changes.\n\nYou can start small: identify 1–2 nearest goals, break the steps down, and take time to care for yourself each day.\n\nIf you'd like, I can suggest an exercise to help ease anxiety right now. Would you like to try?" },
-  { role: "user", time: "09:34", read: true, text: "I'd like to try, thank you!" },
+// Greeting shown at the top of a brand-new conversation (no history yet).
+const WELCOME = [
+  { role: "ai", time: "",
+    text: "Hi there! 👋\nI'm MindCare AI, here to listen and be with you. What would you like to share today?" },
 ];
 
 function nowTime() {
   return new Date().toTimeString().slice(0, 5);
+}
+
+function fmtTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return isNaN(d) ? "" : d.toTimeString().slice(0, 5);
+}
+
+// Convert backend conversation messages → the bubble shape this page renders.
+function mapServerMessages(messages) {
+  return (messages || []).map((m) => {
+    if (m.role === "user")
+      return { role: "user", time: fmtTime(m.created_at), read: true, text: m.content };
+    if (m.role === "assistant")
+      return { role: "ai", time: fmtTime(m.created_at), text: m.content };
+    // system notice (crisis / pending_review / rejected)
+    return { role: "ai", time: fmtTime(m.created_at), text: m.content,
+             crisis: m.status === "crisis" };
+  });
 }
 
 /* Render text with paragraph + line breaks preserved */
@@ -137,10 +152,51 @@ function BreathingRing({ progress = 0.68 }) {
   );
 }
 
+/* ── Conversation history ──────────────────────────────────────── */
+function fmtDay(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  const today = new Date();
+  const sameDay = d.toDateString() === today.toDateString();
+  return sameDay ? d.toTimeString().slice(0, 5) : d.toLocaleDateString("en-GB");
+}
+
+function HistoryCard({ conversations, activeId, onOpen, onNew }) {
+  return (
+    <div className="ai-card">
+      <div className="ai-card-title" style={{ justifyContent: "space-between", display: "flex", alignItems: "center" }}>
+        <span><Icon name="chat" size={17} /> Conversations</span>
+        <button className="ai-btn-primary ai-btn-sm" onClick={onNew}>+ New</button>
+      </div>
+      {conversations.length === 0 ? (
+        <p className="ai-card-text">No past conversations yet. Start chatting and your history will appear here.</p>
+      ) : (
+        <div className="ai-history-list">
+          {conversations.map((c) => (
+            <button
+              key={c.id}
+              className={`ai-history-item ${c.id === activeId ? "active" : ""}`}
+              onClick={() => onOpen(c.id)}
+              title={c.title}
+            >
+              <span className="ai-history-title">{c.title || "Conversation"}</span>
+              <span className="ai-history-time">{fmtDay(c.updated_at)}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ── Right panel ───────────────────────────────────────────────── */
-function RightPanel({ onUseTip }) {
+function RightPanel({ onUseTip, conversations, activeId, onOpen, onNew }) {
   return (
     <aside className="ai-side">
+      {/* Conversation history */}
+      <HistoryCard conversations={conversations} activeId={activeId} onOpen={onOpen} onNew={onNew} />
+
       {/* Quick suggestions */}
       <div className="ai-card">
         <div className="ai-card-title"><Icon name="sparkle" size={17} /> Quick Suggestions</div>
@@ -207,8 +263,9 @@ function RightPanel({ onUseTip }) {
 export default function Chat() {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [messages, setMessages] = useState(SEED);
+  const [messages, setMessages] = useState(WELCOME);
   const [activeId, setActiveId] = useState(null);
+  const [conversations, setConversations] = useState([]);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const pollRef = useRef(null);
@@ -218,6 +275,31 @@ export default function Chat() {
   }, [messages]);
 
   useEffect(() => () => clearInterval(pollRef.current), []);
+
+  async function loadConversations() {
+    try {
+      const r = await api.listConversations();
+      setConversations(r.conversations || []);
+    } catch { /* ignore — history is best-effort */ }
+  }
+  useEffect(() => { loadConversations(); }, []);
+
+  async function openConversation(cid) {
+    if (cid === activeId) return;
+    try {
+      const r = await api.getConversation(cid);
+      const mapped = mapServerMessages(r.messages);
+      setMessages(mapped.length ? mapped : WELCOME);
+      setActiveId(cid);
+    } catch { /* ignore */ }
+  }
+
+  function newChat() {
+    clearInterval(pollRef.current);
+    setMessages(WELCOME);
+    setActiveId(null);
+    inputRef.current?.focus();
+  }
 
   function startPolling(sid, idx) {
     clearInterval(pollRef.current);
@@ -253,7 +335,8 @@ export default function Chat() {
 
     try {
       const r = await api.chat(text, activeId ? { conversation_id: activeId } : {});
-      if (r.conversation_id && r.conversation_id !== activeId) setActiveId(r.conversation_id);
+      const wasNew = r.conversation_id && r.conversation_id !== activeId;
+      if (wasNew) setActiveId(r.conversation_id);
 
       let replyText;
       let crisis = false;
@@ -275,6 +358,8 @@ export default function Chat() {
       });
 
       if (r.outcome === "pending_review" && r.session_id) startPolling(r.session_id, aiIdx);
+      // Refresh the sidebar so a newly-created thread appears (and titles update).
+      loadConversations();
     } catch {
       setMessages((prev) => {
         const next = [...prev];
@@ -362,7 +447,13 @@ export default function Chat() {
         </div>
 
         {/* ── RIGHT: panel ── */}
-        <RightPanel onUseTip={(t) => sendText(t)} />
+        <RightPanel
+          onUseTip={(t) => sendText(t)}
+          conversations={conversations}
+          activeId={activeId}
+          onOpen={openConversation}
+          onNew={newChat}
+        />
       </div>
     </div>
   );

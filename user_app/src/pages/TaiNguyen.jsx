@@ -1,7 +1,37 @@
-﻿import { useState } from "react";
+﻿import { useState, useEffect } from "react";
 import Mascot from "../components/Mascot.jsx";
+import { api } from "../api.js";
 
 const FILTER_TABS = ["All", "Articles", "Audio", "Video", "Emergency", "CBT Tools"];
+
+/* Map a DB resource type → the card's display props (tab bucket, label, icon,
+   CTA, thumb) so DB-backed resources render with the mockup styling. */
+const TYPE_UI = {
+  "Audio":    { category: "Audio",     typeLabel: "Audio",    icon: "♪", action: "Listen Now", thumbClass: "breathing" },
+  "Article":  { category: "Articles",  typeLabel: "Article",  icon: "📄", action: "Read Now",   thumbClass: "grounding" },
+  "Video":    { category: "Video",     typeLabel: "Video",    icon: "▶", action: "Watch Now",  thumbClass: "sleep" },
+  "CBT Tool": { category: "CBT Tools", typeLabel: "CBT Tool", icon: "✎", action: "Use Now",    thumbClass: "journal" },
+};
+
+function toCard(r) {
+  const ui = TYPE_UI[r.type] || TYPE_UI["Article"];
+  const emergency = !!r.urgent;
+  return {
+    id: r.id,
+    category: emergency ? "Emergency" : ui.category,
+    typeLabel: emergency ? "Emergency" : ui.typeLabel,
+    icon: emergency ? "!" : ui.icon,
+    title: r.title,
+    desc: r.description || "",
+    duration: r.duration || (emergency ? "24/7" : ui.typeLabel),
+    tags: r.tags && r.tags.length ? r.tags : [],
+    action: emergency ? "Get Help Now" : ui.action,
+    url: r.url || "",
+    thumbClass: emergency ? "hotline" : ui.thumbClass,
+    useImageIcon: false,
+    emergency,
+  };
+}
 
 const RESOURCES = [
   {
@@ -163,16 +193,27 @@ export default function TaiNguyen() {
   const [activeTab, setActiveTab] = useState("All");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("Newest");
-  const [savedItems, setSavedItems] = useState(new Set(RESOURCES.filter((r) => r.saved).map((r) => r.id)));
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [savedItems, setSavedItems] = useState(new Set());
 
-  const filtered = RESOURCES.filter((resource) => {
+  useEffect(() => {
+    let alive = true;
+    api.resources()
+      .then((r) => { if (alive) setItems((r.resources || []).map(toCard)); })
+      .catch(() => { if (alive) setItems([]); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
+  const filtered = items.filter((resource) => {
     const text = `${resource.title} ${resource.desc} ${resource.typeLabel} ${resource.tags.join(" ")}`.toLowerCase();
     const matchSearch = !search || text.includes(search.toLowerCase());
     const matchTab = activeTab === "All" || resource.category === activeTab;
     return matchSearch && matchTab;
   });
 
-  const savedResources = RESOURCES.filter((resource) => savedItems.has(resource.id));
+  const savedResources = items.filter((resource) => savedItems.has(resource.id));
 
   function toggleSave(id) {
     setSavedItems((prev) => {
@@ -268,10 +309,12 @@ export default function TaiNguyen() {
               <button type="button">View all</button>
             </div>
             <div className="saved-resource-list">
-              {(savedResources.length ? savedResources : SAVED_FALLBACK.map((title) => RESOURCES.find((r) => r.title === title))).slice(0, 3).map((resource, index) => {
-                const title = typeof resource === "string" ? resource : resource?.title || SAVED_FALLBACK[index];
-                return <SavedResourceItem key={title} title={title} resource={typeof resource === "string" ? null : resource} />;
-              })}
+              {(savedResources.length ? savedResources : items).slice(0, 3).map((resource, index) => (
+                <SavedResourceItem key={resource.id || index} title={resource.title} resource={resource} />
+              ))}
+              {!loading && items.length === 0 && (
+                <p className="saved-resource-meta" style={{ padding: "8px 0" }}>No resources yet.</p>
+              )}
             </div>
             <button className="view-saved-btn" type="button">View all saved resources</button>
           </section>
