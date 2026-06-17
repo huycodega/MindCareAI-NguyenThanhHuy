@@ -7,7 +7,9 @@ so dim/space are guaranteed compatible at retrieval time.
 
 Both models load lazily on first use to keep cold-start fast.
 """
+import json
 import logging
+import urllib.request
 from typing import Any, List, Tuple, Optional
 
 from app.core.config import settings
@@ -87,6 +89,29 @@ def _sigmoid(x: float) -> float:
     return e / (1.0 + e)
 
 
+def _rerank_scores_modal(query: str, candidates: List[str]) -> Optional[List[float]]:
+    """Fetch raw reranker logits from the Modal cbt-reranker service.
+    Returns None on any failure so the caller can fall back to local rerank."""
+    url = settings.modal_reranker_endpoint
+    if not url:
+        return None
+    try:
+        body = json.dumps({"query": query, "candidates": candidates}).encode()
+        req = urllib.request.Request(
+            url, data=body,
+            headers={"Content-Type": "application/json"}, method="POST")
+        with urllib.request.urlopen(req, timeout=settings.modal_call_timeout) as r:
+            data = json.loads(r.read().decode())
+        scores = data.get("scores")
+        if isinstance(scores, list) and len(scores) == len(candidates):
+            return [float(s) for s in scores]
+        log.warning("Modal reranker returned %d scores for %d candidates",
+                    len(scores or []), len(candidates))
+    except Exception as e:
+        log.warning("Modal reranker call failed (%s) — local fallback", e)
+    return None
+
+
 def rerank(query: str, candidates: List[str],
            top_k: Optional[int] = None,
            apply_sigmoid: bool = True) -> List[Tuple[int, float]]:
@@ -94,14 +119,20 @@ def rerank(query: str, candidates: List[str],
 
     bge-reranker-v2-m3 outputs a raw relevance logit; with apply_sigmoid
     (default) we map it to a 0–1 probability so scores are comparable to the
-    M3/M4 eval gate (rag_min_score=0.65)."""
+    M3/M4 eval gate (rag_min_score=0.65).
+
+    When MODAL_RERANKER_ENDPOINT is set the raw logits come from the Modal CPU
+    service (keeps the heavy cross-encoder out of a low-RAM local container);
+    otherwise the model is loaded and run in-process."""
     if not candidates:
         return []
-    pairs = [(query, c) for c in candidates]
-    scores = get_reranker().predict(pairs)
+    scores = _rerank_scores_modal(query, candidates)
+    if scores is None:
+        scores = [float(s) for s in get_reranker().predict(
+            [(query, c) for c in candidates])]
     out = []
     for i, s in enumerate(scores):
-        v = _sigmoid(float(s)) if apply_sigmoid else float(s)
+        v = _sigmoid(s) if apply_sigmoid else s
         out.append((i, v))
     ranked = sorted(out, key=lambda x: -x[1])
     if top_k:

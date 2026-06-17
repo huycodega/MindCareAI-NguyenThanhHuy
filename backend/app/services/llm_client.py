@@ -65,7 +65,7 @@ def generate(messages: List[Dict], n: int = None,
 
     t0 = time.time()
     try:
-        with urllib.request.urlopen(req, timeout=180) as r:
+        with urllib.request.urlopen(req, timeout=settings.modal_call_timeout) as r:
             data = json.loads(r.read().decode())
         rc.circuit_record_success()
         data["wall_time"] = time.time() - t0

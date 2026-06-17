@@ -5,6 +5,7 @@ the same image works in Docker Compose, on Modal, and on a bare host.
 import os
 import base64
 from typing import Optional
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,6 +23,14 @@ class Settings(BaseSettings):
     # produced under `data new/qdrant_local` here. It holds the three
     # cbt_rag_bge_m3__* collections; session_memory is created on first boot.
     qdrant_local_path: str = "/app/data/qdrant_local"
+
+    # ---- Modal workspace (single knob to switch deployment account) ----
+    # Set MODAL_WORKSPACE (e.g. "zilex-nikke") and the six Modal endpoint URLs
+    # below are derived automatically — no need to edit each one when you switch
+    # Modal accounts. An explicitly-set MODAL_*_ENDPOINT still wins (override).
+    # Modal deploy names are fixed: cbt-{llm,safety,agent} with functions
+    # generate/assess/chat + health.
+    modal_workspace: Optional[str] = None
 
     # ---- safety gate — Huysun29/cbt-qwen2.5-7b-v2 (QWen2.5-7B fine-tuned v2) ----
     # When MODAL_SAFETY_ENDPOINT is set, calls the Modal-hosted QWen model.
@@ -58,6 +67,21 @@ class Settings(BaseSettings):
     agent_model_repo: str = "Huysun29/cbt-qwen2.5-7b-v2"
     agent_max_steps: int = 6
     agent_temperature: float = 0.3   # low: orchestrator should route, not riff
+
+    # ---- reranker offload to Modal (optional) ----
+    # bge-reranker-v2-m3 is ~2.3 GB; loading it locally alongside the embedder
+    # OOMs a low-RAM container. When MODAL_RERANKER_ENDPOINT is set (or derived
+    # from MODAL_WORKSPACE), embedder.rerank() calls the cbt-reranker Modal CPU
+    # service instead of loading the model in-process. Unset → reranks locally.
+    modal_reranker_endpoint: Optional[str] = None
+    modal_reranker_health_endpoint: Optional[str] = None
+
+    # ---- Modal call timeout (seconds) ----
+    # A cold Modal container loading a 7B model can take 2-4 minutes. Keep this
+    # generous so the FIRST request after a scale-to-zero waits for the model to
+    # warm up instead of tripping the timeout and falling back to the heuristic /
+    # fixed pipeline. Once warm, calls return in seconds. Override via env.
+    modal_call_timeout: int = 600
 
     # ---- retrieval (v2 — risk-aware 3-store router, matches M3/M4 eval) ----
     # BAAI/bge-m3: 1024-dim multilingual. Reranker bge-reranker-v2-m3 (sigmoid).
@@ -168,6 +192,31 @@ class Settings(BaseSettings):
         {"username": "user", "password": "user123", "role": "user"},
         {"username": "clinician", "password": "clinic123", "role": "admin"},
     ]
+
+    @model_validator(mode="after")
+    def _derive_modal_endpoints(self):
+        """When MODAL_WORKSPACE is set, fill any Modal endpoint that wasn't given
+        explicitly. Switching Modal accounts then only needs one env var.
+        Deploy names are fixed by the modal/*_service.py apps."""
+        ws = (self.modal_workspace or "").strip()
+        if not ws:
+            return self
+        base = f"https://{ws}--"
+        derived = {
+            "modal_llm_endpoint":          f"{base}cbt-llm-generate.modal.run",
+            "modal_health_endpoint":       f"{base}cbt-llm-health.modal.run",
+            "modal_safety_endpoint":       f"{base}cbt-safety-assess.modal.run",
+            "modal_safety_health_endpoint": f"{base}cbt-safety-health.modal.run",
+            "modal_agent_endpoint":        f"{base}cbt-agent-chat.modal.run",
+            "modal_agent_health_endpoint": f"{base}cbt-agent-health.modal.run",
+            "modal_reranker_endpoint":     f"{base}cbt-reranker-rerank.modal.run",
+            "modal_reranker_health_endpoint": f"{base}cbt-reranker-health.modal.run",
+        }
+        for field, url in derived.items():
+            # derive only when not set (None or empty) so an explicit endpoint wins
+            if not getattr(self, field):
+                setattr(self, field, url)
+        return self
 
     def phi_key(self) -> bytes:
         """32-byte AES key. Auto-generate on first boot if env empty so

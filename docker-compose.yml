@@ -95,6 +95,10 @@ services:
       AGENT_MODEL_REPO: "Huysun29/cbt-qwen2.5-7b-v2"
 
       MOCK_LLM: "${MOCK_LLM:-false}"
+      # One knob to switch Modal account: set MODAL_WORKSPACE in .env and the 6
+      # endpoint URLs below derive automatically (config.py). Leave the explicit
+      # MODAL_*_ENDPOINT empty to use the derived URLs, or set one to override.
+      MODAL_WORKSPACE: "${MODAL_WORKSPACE:-}"
       MODAL_LLM_ENDPOINT: "${MODAL_LLM_ENDPOINT:-}"
       MODAL_HEALTH_ENDPOINT: "${MODAL_HEALTH_ENDPOINT:-}"
       MODAL_SAFETY_ENDPOINT: "${MODAL_SAFETY_ENDPOINT:-}"
@@ -116,6 +120,9 @@ services:
       # RAG data built by rag-new.ipynb — Qdrant v2 collections (3-store BGE-M3)
       # Path has a space: quote or use the compose path syntax below.
       - "./data new:/app/data"
+      # Persist the HF cache so the bge-m3 embedder isn't re-downloaded on every
+      # --force-recreate. Reuses the host cache that already has bge-m3.
+      - "${USERPROFILE}/.cache/huggingface:/root/.cache/huggingface"
 
   prometheus:
     image: prom/prometheus:latest

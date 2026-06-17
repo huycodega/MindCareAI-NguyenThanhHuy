@@ -54,7 +54,7 @@ def chat(messages: List[Dict],
          tools: Optional[List[Dict]] = None,
          temperature: Optional[float] = None,
          max_new_tokens: int = 512,
-         timeout: int = 180) -> Optional[Dict]:
+         timeout: Optional[int] = None) -> Optional[Dict]:
     """
     One orchestrator step. Returns {"content", "tool_calls", "raw"} or None
     on failure (caller is expected to fall back to the fixed pipeline).
@@ -67,6 +67,9 @@ def chat(messages: List[Dict],
     if not rc.circuit_should_call():
         log.warning("Circuit breaker OPEN — agent orchestrator skipped")
         return None
+
+    if timeout is None:
+        timeout = settings.modal_call_timeout
 
     body = json.dumps({
         "messages": messages,
