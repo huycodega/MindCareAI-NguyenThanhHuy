@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { api, setSession } from "../api.js";
+import AuthLayout from "../components/AuthLayout.jsx";
 
 // Two-step Gmail registration: (1) email + password → OTP emailed,
 // (2) enter OTP → verified + auto-logged-in.
@@ -62,19 +63,21 @@ export default function Register({ onAuth, onBackToLogin }) {
   }
 
   return (
-    <div className="login-wrap">
-      <div className="login-card">
-        <div className="login-logo">🌿</div>
-        <div className="login-title">
-          {step === "form" ? "Create your account" : "Verify your email"}
-        </div>
-        <p className="login-sub">
-          {step === "form"
-            ? "Sign up with your Gmail. A safe, confidential space for student wellbeing — with a clinician reviewing anything sensitive."
-            : `We sent a ${devOtp ? "code" : "verification code"} to ${email}.`}
-        </p>
+    <AuthLayout>
+      <button className="auth2-back" onClick={onBackToLogin}>
+        ← Back to sign in
+      </button>
+      <div className="auth2-card-logo">🌿</div>
+      <div className="login-title">
+        {step === "form" ? "Create your account" : "Verify your email"}
+      </div>
+      <p className="login-sub">
+        {step === "form"
+          ? "Sign up with your Gmail. A safe, confidential space for student wellbeing — with a clinician reviewing anything sensitive."
+          : `We sent a ${devOtp ? "code" : "verification code"} to ${email}.`}
+      </p>
 
-        {step === "form" ? (
+      {step === "form" ? (
           <form onSubmit={submitForm}>
             <div className="field">
               <label>Gmail address</label>
@@ -135,14 +138,13 @@ export default function Register({ onAuth, onBackToLogin }) {
           </form>
         )}
 
-        <div className="divider" />
-        <div className="demo-hint">
-          Already have an account?{" "}
-          <a href="#" onClick={(e) => { e.preventDefault(); onBackToLogin(); }}>
-            Sign in
-          </a>
-        </div>
+      <div className="divider" />
+      <div className="demo-hint">
+        Already have an account?{" "}
+        <a href="#" onClick={(e) => { e.preventDefault(); onBackToLogin(); }}>
+          Sign in
+        </a>
       </div>
-    </div>
+    </AuthLayout>
   );
 }

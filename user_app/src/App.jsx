@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from "react";
+﻿import { useState, useEffect, useLayoutEffect } from "react";
 import { getUser, clearSession, api } from "./api.js";
 import Mascot from "./components/Mascot.jsx";
 import Landing from "./pages/Landing.jsx";
@@ -226,6 +226,36 @@ export default function App() {
       .catch(() => setStage("app"));
   }, [user]);
 
+  // Soft staggered reveal of the outermost cards whenever the page changes.
+  // Runs before paint (useLayoutEffect) so cards start hidden — no flicker.
+  useLayoutEffect(() => {
+    if (stage !== "app") return;
+    const root = document.querySelector(".main-content");
+    if (!root) return;
+    const sel = [
+      ".card", ".st-card", ".profile-card", ".ai-card", ".bh-panel",
+      ".home-section-card", ".home-side-card", ".side-card", ".suggest-card",
+      ".home-hero", ".profile-hero", ".block",
+    ].join(",");
+    const all = Array.from(root.querySelectorAll(sel));
+    // keep only the outermost matches so nested cards don't double-animate
+    const items = all.filter((el) => !all.some((o) => o !== el && o.contains(el)));
+    items.forEach((el, i) => {
+      el.classList.add("u-reveal");
+      el.style.setProperty("--rd", `${Math.min(i, 9) * 0.05}s`);
+    });
+    const raf = requestAnimationFrame(() =>
+      items.forEach((el) => el.classList.add("u-reveal-in"))
+    );
+    return () => {
+      cancelAnimationFrame(raf);
+      items.forEach((el) => {
+        el.classList.remove("u-reveal", "u-reveal-in");
+        el.style.removeProperty("--rd");
+      });
+    };
+  }, [activePage, stage]);
+
   function handleAuth(u) { setUser(u); setShowLogin(false); }
 
   function logout() {
@@ -265,7 +295,7 @@ export default function App() {
           {isChatPage ? (
             pages.chat
           ) : (
-            <div className="page-content">
+            <div className="page-content" key={activePage}>
               {pages[activePage]}
             </div>
           )}

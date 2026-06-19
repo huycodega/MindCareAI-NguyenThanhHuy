@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api, setSession } from "../api.js";
 import Register from "./Register.jsx";
+import AuthLayout from "../components/AuthLayout.jsx";
 
 export default function Login({ onAuth, onBack }) {
   const [mode, setMode] = useState("login"); // login | register
@@ -31,55 +32,46 @@ export default function Login({ onAuth, onBack }) {
   }
 
   return (
-    <div className="login-wrap">
-      <div className="login-card">
-        {onBack && (
-          <button
-            onClick={onBack}
-            style={{
-              background: "none", border: "none", cursor: "pointer",
-              color: "var(--ink-soft)", fontSize: 13, fontFamily: "var(--font)",
-              marginBottom: 16, padding: 0, display: "flex", alignItems: "center", gap: 4,
-            }}
-          >
-            ← Back to home
-          </button>
-        )}
-        <div className="login-logo">🌿</div>
-        <div className="login-title">Welcome back</div>
-        <p className="login-sub">
-          A safe space to talk. CBT-guided support with a clinician
-          reviewing anything sensitive — AI never responds alone on critical cases.
-        </p>
+    <AuthLayout>
+      {onBack && (
+        <button className="auth2-back" onClick={onBack}>
+          ← Back to home
+        </button>
+      )}
+      <div className="auth2-card-logo">🌿</div>
+      <div className="login-title">Welcome back</div>
+      <p className="login-sub">
+        A safe space to talk. CBT-guided support with a clinician
+        reviewing anything sensitive — AI never responds alone on critical cases.
+      </p>
 
-        <form onSubmit={submit}>
-          <div className="field">
-            <label>Gmail or username</label>
-            <input value={username} onChange={(e) => setU(e.target.value)}
-              placeholder="you@gmail.com" autoFocus />
-          </div>
-          <div className="field">
-            <label>Password</label>
-            <input type="password" value={password} onChange={(e) => setP(e.target.value)} />
-          </div>
-          {err && <div className="banner crisis">{err}</div>}
-          <button className="btn accent full" disabled={busy} style={{ marginTop: 4 }}>
-            {busy ? <span className="spinner" /> : null}
-            Sign in
-          </button>
-        </form>
+      <form onSubmit={submit}>
+        <div className="field">
+          <label>Gmail or username</label>
+          <input value={username} onChange={(e) => setU(e.target.value)}
+            placeholder="you@gmail.com" autoFocus />
+        </div>
+        <div className="field">
+          <label>Password</label>
+          <input type="password" value={password} onChange={(e) => setP(e.target.value)} />
+        </div>
+        {err && <div className="banner crisis">{err}</div>}
+        <button className="btn accent full" disabled={busy} style={{ marginTop: 4 }}>
+          {busy ? <span className="spinner" /> : null}
+          Sign in
+        </button>
+      </form>
 
-        <div className="divider" />
-        <div className="demo-hint">
-          New here?{" "}
-          <a href="#" onClick={(e) => { e.preventDefault(); setMode("register"); }}>
-            Create an account with Gmail
-          </a>
-        </div>
-        <div className="demo-hint" style={{ marginTop: 6, opacity: 0.7 }}>
-          Demo: <strong>user</strong> / <strong>user123</strong>
-        </div>
+      <div className="divider" />
+      <div className="demo-hint">
+        New here?{" "}
+        <a href="#" onClick={(e) => { e.preventDefault(); setMode("register"); }}>
+          Create an account with Gmail
+        </a>
       </div>
-    </div>
+      <div className="demo-hint" style={{ marginTop: 6, opacity: 0.7 }}>
+        Demo: <strong>user</strong> / <strong>user123</strong>
+      </div>
+    </AuthLayout>
   );
 }
