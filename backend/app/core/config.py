@@ -76,6 +76,14 @@ class Settings(BaseSettings):
     modal_reranker_endpoint: Optional[str] = None
     modal_reranker_health_endpoint: Optional[str] = None
 
+    # ---- embedder offload to Modal (optional) ----
+    # bge-m3 is ~2.2 GB; loading it in-process OOMs a free-tier / low-RAM host.
+    # When MODAL_EMBEDDER_ENDPOINT is set (or derived from MODAL_WORKSPACE),
+    # embedder.embed() calls the cbt-embedder Modal CPU service instead of
+    # loading the model locally. Unset → embeds in-process.
+    modal_embedder_endpoint: Optional[str] = None
+    modal_embedder_health_endpoint: Optional[str] = None
+
     # ---- Modal call timeout (seconds) ----
     # A cold Modal container loading a 7B model can take 2-4 minutes. Keep this
     # generous so the FIRST request after a scale-to-zero waits for the model to
@@ -211,6 +219,8 @@ class Settings(BaseSettings):
             "modal_agent_health_endpoint": f"{base}cbt-agent-health.modal.run",
             "modal_reranker_endpoint":     f"{base}cbt-reranker-rerank.modal.run",
             "modal_reranker_health_endpoint": f"{base}cbt-reranker-health.modal.run",
+            "modal_embedder_endpoint":     f"{base}cbt-embedder-embed.modal.run",
+            "modal_embedder_health_endpoint": f"{base}cbt-embedder-health.modal.run",
         }
         for field, url in derived.items():
             # derive only when not set (None or empty) so an explicit endpoint wins
