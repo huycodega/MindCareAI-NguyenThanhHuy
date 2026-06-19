@@ -86,12 +86,8 @@ def embed(body: dict):
     return svc.embed.remote(texts=body.get("texts", []))
 
 
-@app.function(image=image)
-@modal.fastapi_endpoint(method="GET")
-def health():
-    """GET /health"""
-    return {"status": "ok", "model": EMBEDDER_REPO, "dim": EMBED_DIM,
-            "role": "embedder"}
+# NOTE: no /health endpoint — Modal free tier caps web functions at 8, and the
+# backend only health-checks llm/safety/agent. The embedder exposes just /embed.
 
 
 @app.local_entrypoint()
