@@ -207,6 +207,20 @@ class Settings(BaseSettings):
     ]
 
     @model_validator(mode="after")
+    def _normalize_db_url(self):
+        """Railway/Render inject DATABASE_URL as 'postgresql://' (or Heroku-style
+        'postgres://'), which SQLAlchemy maps to the psycopg2 driver. This app
+        uses psycopg3, so rewrite the scheme to 'postgresql+psycopg://'."""
+        url = self.database_url
+        if url.startswith("postgresql+"):
+            return self
+        if url.startswith("postgresql://"):
+            self.database_url = "postgresql+psycopg://" + url[len("postgresql://"):]
+        elif url.startswith("postgres://"):
+            self.database_url = "postgresql+psycopg://" + url[len("postgres://"):]
+        return self
+
+    @model_validator(mode="after")
     def _derive_modal_endpoints(self):
         """When MODAL_WORKSPACE is set, fill any Modal endpoint that wasn't given
         explicitly. Switching Modal accounts then only needs one env var.
