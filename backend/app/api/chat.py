@@ -192,9 +192,12 @@ def chat(body: ChatIn, request: Request,
             "outcome": "crisis",
             "triage": triage,
             "crisis_resources": CRISIS_RESOURCES,
-            "message": ("Based on what you shared, the system is concerned "
-                         "for your safety. AI will not respond automatically. "
-                         "Please reach out to the resources below."),
+            "message": ("I'm really glad you told me this — what you're "
+                         "carrying sounds incredibly heavy, and you don't have "
+                         "to hold it on your own. Because your safety matters "
+                         "most, I won't send an automated reply here. Please "
+                         "reach out to one of the resources below right now — "
+                         "real people are ready to listen, any time of day."),
         }
 
     # ---- L1: High risk — NO draft, push to clinician ----
@@ -212,8 +215,12 @@ def chat(body: ChatIn, request: Request,
             "conversation_id": str(convo.id),
             "outcome": "pending_review",
             "triage": triage, "crisis_resources": CRISIS_RESOURCES,
-            "message": ("Your message will be reviewed by a clinician "
-                         "directly. AI will not generate an automated reply."),
+            "message": ("Thank you for trusting me with something this hard. "
+                         "What you shared matters, and I want a real person to "
+                         "give it the care it deserves — a clinician is "
+                         "reviewing your message now and will follow up. If "
+                         "anything feels urgent while you wait, the resources "
+                         "below are here for you any time."),
         }
 
     # ---- L2 / L3: full pipeline ----

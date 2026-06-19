@@ -110,10 +110,29 @@ function ChatBubble({ msg }) {
       <div className="ai-msg">
         <div className={`ai-bubble ${isAI ? "ai-bubble-ai" : "ai-bubble-user"} ${msg.error ? "ai-bubble-error" : ""}`}>
           <MsgText text={msg.text} />
-          {msg.crisis && (
+          {(msg.resources || msg.crisis) && (
             <div className="ai-bubble-hotline">
               <Icon name="phone" size={16} />
-              <span>If you're in crisis, call <strong>1900 1234</strong> — available 24/7.</span>
+              {msg.resources ? (
+                <span className="hotline-list">
+                  {Object.values(msg.resources).map((res, i) => {
+                    const isLink = String(res.phone).startsWith("http");
+                    return (
+                      <span key={i} className="hotline-item">
+                        <strong>{res.name}</strong>{" "}
+                        {isLink ? (
+                          <a href={res.url} target="_blank" rel="noreferrer">{res.url}</a>
+                        ) : (
+                          <>— call <strong>{res.phone}</strong></>
+                        )}
+                        {res.available ? ` · ${res.available}` : ""}
+                      </span>
+                    );
+                  })}
+                </span>
+              ) : (
+                <span>If you're in crisis, call <strong>988</strong> — available 24/7.</span>
+              )}
             </div>
           )}
         </div>
@@ -238,8 +257,8 @@ function RightPanel({ onUseTip, conversations, activeId, onOpen, onNew }) {
         <div className="ai-hotline">
           <span className="ai-hotline-icon"><Icon name="phone" size={18} /></span>
           <div>
-            <div className="ai-hotline-label">24/7 Support Hotline</div>
-            <a className="ai-hotline-num" href="tel:19001234">1900 1234</a>
+            <div className="ai-hotline-label">24/7 Suicide &amp; Crisis Lifeline</div>
+            <a className="ai-hotline-num" href="tel:988">988</a>
           </div>
         </div>
       </div>
@@ -340,8 +359,12 @@ export default function Chat() {
 
       let replyText;
       let crisis = false;
+      // crisis_resources is sent for both L0 (crisis) and L1 (pending_review)
+      // so the user always has a real-person lifeline to reach for.
+      let resources = r.crisis_resources || null;
       if (r.outcome === "answered") {
         replyText = r.final?.response || "I'm here with you.";
+        resources = null;
       } else if (r.outcome === "crisis") {
         replyText = r.message || "I'm really glad you reached out. Your safety matters most right now.";
         crisis = true;
@@ -349,11 +372,12 @@ export default function Chat() {
         replyText = r.message || "Thank you for sharing. A clinician is reviewing your message and will respond shortly.";
       } else {
         replyText = r.message || "I'm here with you.";
+        resources = null;
       }
 
       setMessages((prev) => {
         const next = [...prev];
-        next[aiIdx] = { role: "ai", time: nowTime(), text: replyText, crisis };
+        next[aiIdx] = { role: "ai", time: nowTime(), text: replyText, crisis, resources };
         return next;
       });
 

@@ -110,7 +110,7 @@ const RESOURCES = [
     desc: "Free, confidential support available whenever you need someone to listen.",
     duration: "24/7",
     tags: ["24/7", "Immediate support"],
-    action: "Call 1900 1234",
+    action: "Call 988",
     saved: false,
     thumbClass: "hotline",
     useImageIcon: true,

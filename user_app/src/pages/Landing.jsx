@@ -244,7 +244,7 @@ export default function Landing({ onSignIn }) {
           </p>
           <p className="landing-footer-text" style={{ marginTop: 8, fontSize: 12, color: "#94A3B8" }}>
             © 2026 MindCare AI · Not a substitute for professional medical advice.
-            If you're in crisis, call <strong style={{ color: "#F87171" }}>1800 599 920</strong> (24/7)
+            If you're in crisis, call <strong style={{ color: "#F87171" }}>988</strong> — Suicide &amp; Crisis Lifeline (24/7)
           </p>
         </div>
       </footer>

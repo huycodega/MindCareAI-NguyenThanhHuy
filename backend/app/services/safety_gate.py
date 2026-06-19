@@ -37,7 +37,13 @@ log = logging.getLogger(__name__)
 _L0_PAT = re.compile(
     r"\b(kill\s+my\s*self|end\s+(it\s+all|my\s+life)|want\s+to\s+die|"
     r"suicid\w*|no\s+reason\s+to\s+live|disappear\s+forever|"
-    r"take\s+my\s+(own\s+)?life)\b", re.I)
+    r"take\s+my\s+(own\s+)?life|"
+    # active planning / preparation behaviour. "looked up methods" must be
+    # adjacent — a topic noun in between ("study methods", "research methods")
+    # is benign and must NOT trip the crisis net.
+    r"look(ed|ing)?\s+up\s+(a\s+|some\s+)?methods?\b(?!\s+(to|for|of|on|about)\s+\w)|"
+    r"(method|way)s?\s+to\s+(die|kill\s+my|end\s+(it|my)|hurt\s+my|harm\s+my)|"
+    r"how\s+to\s+(kill\s+my|end\s+my\s+life|end\s+it))\b", re.I)
 
 _L1_PAT = re.compile(
     r"\b(self.?harm|cut\s+my\s*self|hurt\s+my\s*self|hurt\s+(someone|him|her|them)|"
@@ -59,6 +65,11 @@ def _heuristic(text: str) -> Dict:
         return {"triage_level": "L1", "severity": "high",
                 "confidence": 0.78, "reason": "High-risk language detected",
                 "source": "heuristic"}
+    if _PASSIVE_RISK_PAT.search(text):
+        return {"triage_level": "L1", "severity": "high",
+                "confidence": 0.72,
+                "reason": "Passive ideation / self-erasure language detected",
+                "source": "heuristic"}
     if _L2_PAT.search(text):
         return {"triage_level": "L2", "severity": "moderate",
                 "confidence": 0.55, "reason": "Moderate distress markers",
@@ -68,14 +79,30 @@ def _heuristic(text: str) -> Dict:
             "source": "heuristic"}
 
 
-# Passive / indirect ideation markers the L0/L1 patterns miss but the agent's
-# defense-in-depth re-check should still catch (giving away possessions, "no
-# point anymore", "done trying"). Used by agent.py, NOT by the primary gate.
+# Passive / indirect ideation markers the L0/L1 keyword patterns miss: self-
+# erasure ("disappeared for a while"), burdensomeness ("less disappointed if I
+# was gone"), exhaustion-of-being ("tired of existing"), and the "pretending
+# I'm okay" mask. These are genuine passive suicidal-ideation signals, so they
+# now feed the PRIMARY gate (_heuristic → L1 hard override), not just the
+# agent's defense-in-depth re-check. Patterns require a self-referential context
+# so value/meaning distress ("what's the point of this degree?") stays L2.
 _PASSIVE_RISK_PAT = re.compile(
-    r"\b(no\s+point\s+(anymore|in\s+(living|trying|going\s+on))|"
+    r"\b("
+    r"no\s+point\s+(anymore|in\s+(living|trying|going\s+on))|"
+    r"what'?s\s+the\s+point\s+(anymore|of\s+(it\s+all|living|trying|going\s+on|even\s+being\s+here))|"
     r"done\s+trying|giving\s+away\s+my\s+(things|stuff|belongings|possessions)|"
-    r"better\s+off\s+without\s+me|nothing\s+(will|is\s+going\s+to)\s+get\s+better|"
-    r"tired\s+of\s+(it\s+all|living|everything|all\s+of\s+this))\b", re.I)
+    r"better\s+off\s+(without\s+me|if\s+i\s+(was|were)\s+(gone|dead|not\s+here))|"
+    r"nothing\s+(will|is\s+going\s+to)\s+get\s+better|"
+    r"(no|don'?t\s+see\s+a|can'?t\s+see\s+a|there'?s\s+no)\s+way\s+out|"
+    r"tired\s+of\s+(it\s+all|living|everything|all\s+of\s+this|existing|"
+    r"being\s+(alive|here|around))|"
+    r"(disappear|disappeared)\s+for\s+(a\s+while|good)|"
+    r"if\s+i\s+(?:\w+\s+){0,2}(disappeared|was\s+gone|were\s+gone|"
+    r"wasn'?t\s+(here|around)|weren'?t\s+here)|"
+    r"(less\s+disappointed|happier|better\s+off)\s+if\s+i\s+"
+    r"(?:\w+\s+){0,2}(disappeared|was\s+gone|wasn'?t\s+here)|"
+    r"pretending\s+(i'?m|to\s+be)\s+(ok|okay|fine|alright|all\s+right)"
+    r")\b", re.I)
 
 
 def has_acute_risk(text: str) -> bool:

@@ -3445,7 +3445,7 @@ h1.title { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin-bo
 
 .ai-bubble-hotline {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   margin-top: 10px;
   padding: 9px 12px;
@@ -3454,6 +3454,9 @@ h1.title { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin-bo
   font-size: 13px;
   color: var(--danger-dark);
 }
+.hotline-list { display: flex; flex-direction: column; gap: 6px; }
+.hotline-item { display: block; line-height: 1.45; }
+.hotline-item a { color: var(--danger-dark); text-decoration: underline; }
 
 /* Typing */
 .ai-typing { display: flex; align-items: center; gap: 5px; padding: 16px; }
