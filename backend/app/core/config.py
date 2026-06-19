@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     # produced under `data new/qdrant_local` here. It holds the three
     # cbt_rag_bge_m3__* collections; session_memory is created on first boot.
     qdrant_local_path: str = "/app/data/qdrant_local"
+    # Qdrant Cloud (managed) — when QDRANT_URL is set the client connects to the
+    # hosted cluster (url + api_key) instead of the local file directory. Lets
+    # the backend run on a stateless host (Railway/Render) with no local volume.
+    qdrant_url: Optional[str] = None
+    qdrant_api_key: Optional[str] = None
 
     # ---- Modal workspace (single knob to switch deployment account) ----
     # Set MODAL_WORKSPACE (e.g. "zilex-nikke") and the six Modal endpoint URLs
