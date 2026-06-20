@@ -368,44 +368,82 @@ export default function Chat() {
     setInput("");
     setBusy(true);
 
+    // The agent can take a few minutes on a cold start — longer than the
+    // hosting gateway keeps a single request open. The backend still finishes
+    // and SAVES the reply, so as a safety net we poll for the freshly-created
+    // session and show its reply the moment it lands (no manual reload, no
+    // "couldn't reach server"). Whichever resolves first — the direct /chat
+    // response or the poll — wins; the other is ignored.
+    let settled = false;
+    const show = (obj, after) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(pollStartTimer);
+      clearInterval(pollRef.current);
+      setMessages((prev) => { const n = [...prev]; n[aiIdx] = obj; return n; });
+      loadConversations();
+      if (after) after();
+    };
+
+    const fromSession = async (sess) => {
+      if (sess.status === "auto_sent" || sess.status === "answered") {
+        let txt = "I'm here with you.";
+        try { const full = await api.mySession(sess.id); txt = full.final_reply || txt; } catch {}
+        show({ role: "ai", time: nowTime(), text: txt });
+      } else if (sess.status === "pending_review") {
+        show({ role: "ai", time: nowTime(), text: "Thank you for sharing. A clinician is reviewing the response and will respond shortly." },
+          () => startPolling(sess.id, aiIdx));
+      } else if (sess.status === "crisis") {
+        let txt = "I'm really glad you reached out. Your safety matters most right now.";
+        try { const full = await api.mySession(sess.id); txt = full.final_reply || txt; } catch {}
+        show({ role: "ai", time: nowTime(), text: txt, crisis: true });
+      }
+    };
+
+    let knownIds = null;
+    const startReplyPoll = async () => {
+      if (settled || pollRef.current) return;
+      if (knownIds === null) {
+        try { const s0 = await api.mySessions(); knownIds = new Set((s0.sessions || []).map((x) => x.id)); }
+        catch { knownIds = new Set(); }
+      }
+      const t0 = Date.now();
+      pollRef.current = setInterval(async () => {
+        if (settled) { clearInterval(pollRef.current); return; }
+        if (Date.now() - t0 > 8 * 60 * 1000) {
+          show({ role: "ai", time: nowTime(), error: true, text: "This is taking longer than usual — please reload in a moment to see the reply." });
+          return;
+        }
+        try {
+          const r = await api.mySessions();
+          const fresh = (r.sessions || []).find((x) => !knownIds.has(x.id));
+          if (fresh) await fromSession(fresh);
+        } catch {}
+      }, 5000);
+    };
+    // Give the direct request a head start; only poll if it's slow.
+    const pollStartTimer = setTimeout(startReplyPoll, 12000);
+
     try {
       const r = await api.chat(text, activeId ? { conversation_id: activeId } : {});
-      const wasNew = r.conversation_id && r.conversation_id !== activeId;
-      if (wasNew) setActiveId(r.conversation_id);
-
-      let replyText;
-      let crisis = false;
+      if (settled) return;
+      if (r.conversation_id && r.conversation_id !== activeId) setActiveId(r.conversation_id);
       // crisis_resources is sent for both L0 (crisis) and L1 (pending_review)
       // so the user always has a real-person lifeline to reach for.
-      let resources = r.crisis_resources || null;
+      const resources = r.crisis_resources || null;
       if (r.outcome === "answered") {
-        replyText = r.final?.response || "I'm here with you.";
-        resources = null;
+        show({ role: "ai", time: nowTime(), text: r.final?.response || "I'm here with you." });
       } else if (r.outcome === "crisis") {
-        replyText = r.message || "I'm really glad you reached out. Your safety matters most right now.";
-        crisis = true;
+        show({ role: "ai", time: nowTime(), text: r.message || "I'm really glad you reached out. Your safety matters most right now.", crisis: true, resources });
       } else if (r.outcome === "pending_review") {
-        replyText = r.message || "Thank you for sharing. A clinician is reviewing your message and will respond shortly.";
+        show({ role: "ai", time: nowTime(), text: r.message || "Thank you for sharing. A clinician is reviewing your message and will respond shortly.", resources },
+          () => r.session_id && startPolling(r.session_id, aiIdx));
       } else {
-        replyText = r.message || "I'm here with you.";
-        resources = null;
+        show({ role: "ai", time: nowTime(), text: r.message || "I'm here with you." });
       }
-
-      setMessages((prev) => {
-        const next = [...prev];
-        next[aiIdx] = { role: "ai", time: nowTime(), text: replyText, crisis, resources };
-        return next;
-      });
-
-      if (r.outcome === "pending_review" && r.session_id) startPolling(r.session_id, aiIdx);
-      // Refresh the sidebar so a newly-created thread appears (and titles update).
-      loadConversations();
     } catch {
-      setMessages((prev) => {
-        const next = [...prev];
-        next[aiIdx] = { role: "ai", time: nowTime(), error: true, text: "Sorry, I couldn't reach the server. Please try again in a moment." };
-        return next;
-      });
+      // Gateway cut the long request — let the poll recover the saved reply.
+      if (!settled) startReplyPoll();
     } finally {
       setBusy(false);
     }
