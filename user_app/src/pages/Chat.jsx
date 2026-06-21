@@ -132,8 +132,35 @@ function parseRecs(text, library) {
   return { body: body || text, recs };
 }
 
+/* ── In-chat psychologist booking helpers ─────────────────────────── */
+function isoDate(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function fmtApptDate(iso) {
+  if (!iso) return "";
+  return new Date(iso + "T00:00:00").toLocaleDateString("en-GB",
+    { weekday: "short", day: "numeric", month: "short" });
+}
+/* Flatten an expert's availability into the next free date+slot options. */
+function upcomingSlots(avail, limit = 8) {
+  if (!avail || !avail.window) return [];
+  const taken = new Set((avail.booked || []).map((b) => `${b.date} ${b.slot}`));
+  const slots = avail.expert?.slots || [];
+  const out = [];
+  const start = new Date(avail.window.from + "T00:00:00");
+  const end = new Date(avail.window.to + "T00:00:00");
+  for (let d = new Date(start); d <= end && out.length < limit; d.setDate(d.getDate() + 1)) {
+    const ds = isoDate(d);
+    for (const sl of slots) {
+      if (out.length >= limit) break;
+      if (!taken.has(`${ds} ${sl}`)) out.push({ date: ds, slot: sl });
+    }
+  }
+  return out;
+}
+
 /* ── Chat bubble ───────────────────────────────────────────────── */
-function ChatBubble({ msg, library, onOpenRec, onTalkExpert }) {
+function ChatBubble({ msg, library, onOpenRec, onTalkExpert, onManageAppt }) {
   const isAI = msg.role === "ai";
   const { body, recs } = isAI
     ? parseRecs(msg.text, library)
@@ -197,6 +224,20 @@ function ChatBubble({ msg, library, onOpenRec, onTalkExpert }) {
               )}
             </div>
           )}
+          {msg.appt && (
+            <div className="ai-appt-card">
+              <div className="ai-appt-title">✅ Appointment booked — please check it's correct</div>
+              <div className="ai-appt-row">🧑‍⚕️ <strong>{msg.appt.name}</strong>{msg.appt.specialty ? ` · ${msg.appt.specialty}` : ""}</div>
+              <div className="ai-appt-row">📅 {fmtApptDate(msg.appt.date)} &nbsp; 🕐 {msg.appt.slot}</div>
+              {msg.appt.phone && <div className="ai-appt-row">📞 {msg.appt.phone}</div>}
+              <div className="ai-appt-status">Status: <strong>pending</strong> the expert's confirmation</div>
+              {onManageAppt && (
+                <button className="ai-appt-manage" onClick={onManageAppt}>
+                  View / change in Counselling →
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <div className="ai-meta">
           <span>{msg.time}</span>
@@ -214,6 +255,71 @@ function TypingBubble() {
       <div className="ai-bubble ai-bubble-ai ai-thinking">
         <span className="ai-thinking-label">MindCare is thinking</span>
         <span className="ai-typing"><span /><span /><span /></span>
+      </div>
+    </div>
+  );
+}
+
+/* In-chat psychologist booking: pick an expert → pick a free time → booked.
+   Rendered as an assistant card at the foot of the feed (transient). */
+function ExpertBookingCard({ state, onPickExpert, onPickSlot, onBack, onCancel }) {
+  const { step, loading, experts = [], expert, avail, booking, error } = state;
+  const slots = step === "slots" ? upcomingSlots(avail, 8) : [];
+  return (
+    <div className="ai-row ai">
+      <div className="ai-avatar"><Mascot variant="chat" size={30} className="mascot-idle" /></div>
+      <div className="ai-msg">
+        <div className="ai-bubble ai-bubble-ai ai-book">
+          {step === "experts" && (
+            <>
+              <div className="ai-book-title">Let's connect you with a psychologist. Who would you like to talk to?</div>
+              {loading ? <div className="ai-book-loading">Loading psychologists…</div> : (
+                experts.length === 0 ? (
+                  <div className="ai-book-empty">No psychologists are available right now — please use the hotline above.</div>
+                ) : (
+                  <div className="ai-book-experts">
+                    {experts.map((e) => (
+                      <button key={e.id} className="ai-book-expert" onClick={() => onPickExpert(e)}>
+                        <span className="ai-book-avatar">{e.name.slice(0, 1).toUpperCase()}</span>
+                        <span className="ai-book-exp-info">
+                          <span className="ai-book-exp-name">{e.name}</span>
+                          <span className="ai-book-exp-spec">{e.specialty || "Counselling"}{e.experience ? ` · ${e.experience}` : ""}</span>
+                        </span>
+                        <span className="ai-rec-arrow">›</span>
+                      </button>
+                    ))}
+                  </div>
+                )
+              )}
+              <button className="ai-book-cancel" onClick={onCancel}>Not now</button>
+            </>
+          )}
+
+          {step === "slots" && (
+            <>
+              <div className="ai-book-title">Pick a time with <strong>{expert?.name}</strong> (next 3 weeks):</div>
+              {loading ? <div className="ai-book-loading">Loading available times…</div> : (
+                slots.length === 0 ? (
+                  <div className="ai-book-empty">No free slots in the next 3 weeks — try another psychologist.</div>
+                ) : (
+                  <div className="ai-book-slots">
+                    {slots.map((s) => (
+                      <button key={s.date + s.slot} className="ai-book-slot" disabled={booking}
+                              onClick={() => onPickSlot(s.date, s.slot)}>
+                        {fmtApptDate(s.date)} · {s.slot}
+                      </button>
+                    ))}
+                  </div>
+                )
+              )}
+              {error && <div className="ai-book-error">{error}</div>}
+              <div className="ai-book-foot">
+                <button className="ai-book-cancel" onClick={onBack} disabled={booking}>← Back</button>
+                {booking && <span className="ai-book-loading">Booking…</span>}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -365,6 +471,7 @@ export default function Chat({ onNav }) {
   const [conversations, setConversations] = useState([]);
   const [library, setLibrary] = useState([]);     // lessons+resources for clickable recs
   const [recDetail, setRecDetail] = useState(null);
+  const [expertBooking, setExpertBooking] = useState(null); // in-chat booking flow
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const pollRef = useRef(null);
@@ -372,7 +479,7 @@ export default function Chat({ onNav }) {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, expertBooking]);
 
   // Load the library once so "From your library" recommendations can be matched
   // to real lessons/resources and opened on tap.
@@ -416,7 +523,48 @@ export default function Chat({ onNav }) {
     pendingRef.current = null;
     setMessages(WELCOME);
     setActiveId(null);
+    setExpertBooking(null);
     inputRef.current?.focus();
+  }
+
+  // ── In-chat psychologist booking (opened from the crisis "Talk to a
+  //    psychologist" CTA) — pick expert → pick time → auto-book → confirm. ──
+  async function startExpertBooking() {
+    setExpertBooking({ step: "experts", loading: true, experts: [] });
+    try {
+      const r = await api.experts();
+      const experts = r.experts || [];
+      if (!experts.length && onNav) { setExpertBooking(null); onNav("tuvan"); return; }
+      setExpertBooking({ step: "experts", loading: false, experts });
+    } catch {
+      setExpertBooking(null);
+      if (onNav) onNav("tuvan");   // fall back to the full Counselling page
+    }
+  }
+  async function pickExpert(e) {
+    setExpertBooking((b) => ({ ...b, step: "slots", loading: true, expert: e, error: "" }));
+    try {
+      const av = await api.expertAvailability(e.id);
+      setExpertBooking((b) => ({ ...b, step: "slots", loading: false, expert: e, avail: av }));
+    } catch (err) {
+      setExpertBooking((b) => ({ ...b, step: "slots", loading: false, error: err.message }));
+    }
+  }
+  async function bookSlot(date, slot) {
+    const exp = expertBooking?.expert;
+    if (!exp) return;
+    setExpertBooking((b) => ({ ...b, booking: true, error: "" }));
+    try {
+      await api.bookAppointment({ psychologist_id: exp.id, date, slot });
+      setExpertBooking(null);
+      setMessages((prev) => [...prev, {
+        role: "ai", time: nowTime(),
+        text: "I've booked this consultation for you — please check the details below are correct.",
+        appt: { name: exp.name, specialty: exp.specialty, phone: exp.phone, date, slot },
+      }]);
+    } catch (err) {
+      setExpertBooking((b) => ({ ...b, booking: false, error: err.message }));
+    }
   }
 
   // Apply a fetched session: when the clinician has answered/rejected, swap the
@@ -597,7 +745,21 @@ export default function Chat({ onNav }) {
             {!messages.some((m) => m.role === "user") && messages.length <= 1 ? (
               <EmptyState greeting={messages[0]?.text || WELCOME[0].text} />
             ) : (
-              messages.map((m, i) => (m.typing ? <TypingBubble key={i} /> : <ChatBubble key={i} msg={m} library={library} onOpenRec={(r) => setRecDetail(r)} onTalkExpert={onNav ? () => onNav("tuvan") : null} />))
+              messages.map((m, i) => (m.typing ? <TypingBubble key={i} /> : (
+                <ChatBubble key={i} msg={m} library={library}
+                  onOpenRec={(r) => setRecDetail(r)}
+                  onTalkExpert={startExpertBooking}
+                  onManageAppt={onNav ? () => onNav("tuvan") : null} />
+              )))
+            )}
+            {expertBooking && (
+              <ExpertBookingCard
+                state={expertBooking}
+                onPickExpert={pickExpert}
+                onPickSlot={bookSlot}
+                onBack={startExpertBooking}
+                onCancel={() => setExpertBooking(null)}
+              />
             )}
             <div ref={bottomRef} />
           </div>
