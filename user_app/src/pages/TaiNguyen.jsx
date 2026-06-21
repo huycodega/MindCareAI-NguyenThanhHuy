@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Mascot from "../components/Mascot.jsx";
 import { api } from "../api.js";
 
@@ -101,7 +102,7 @@ function ResourceDetail({ resource, onClose }) {
   const linkLabel = resource.rawType === "Audio" ? "▶ Listen"
     : resource.rawType === "Video" ? "▶ Watch" : "Open resource ↗";
 
-  return (
+  return createPortal(
     <div className="lx-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="lx-modal" role="dialog" aria-modal="true" aria-label={resource.title}>
         <button className="lx-close" onClick={onClose} aria-label="Close">✕</button>
@@ -130,7 +131,8 @@ function ResourceDetail({ resource, onClose }) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

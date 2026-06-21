@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { api } from "../api.js";
 
 const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -157,7 +158,7 @@ export default function TuVan() {
       )}
 
       {/* Cancel confirmation (in-app, not the browser dialog) */}
-      {confirmA && (
+      {confirmA && createPortal(
         <div className="lx-overlay lx-overlay-center" onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmA(null); }}>
           <div className="lx-modal tv-confirm" role="dialog" aria-modal="true">
             <h2 className="lx-title">Cancel this appointment?</h2>
@@ -170,7 +171,8 @@ export default function TuVan() {
               <button className="tv-btn-danger" onClick={() => doCancel(confirmA)}>Yes, cancel</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
@@ -187,7 +189,7 @@ function BookingModal({ booking, selDate, onSelDate, freeSlots, onPick, onClose 
   const pad = days.length ? days[0].getDay() : 0;
   const slots = selDate ? freeSlots(selDate) : [];
 
-  return (
+  return createPortal(
     <div className="lx-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="lx-modal tv-modal" role="dialog" aria-modal="true">
         <button className="lx-close" onClick={onClose} aria-label="Close">✕</button>
@@ -242,6 +244,7 @@ function BookingModal({ booking, selDate, onSelDate, freeSlots, onPick, onClose 
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

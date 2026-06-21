@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Mascot from "../components/Mascot.jsx";
 import { api } from "../api.js";
 
@@ -384,7 +385,7 @@ function LessonDetail({ lesson, prog, onClose, onSave }) {
     onSave(lesson.id, [...all], objectives.length);
   }
 
-  return (
+  return createPortal(
     <div className="lx-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="lx-modal" role="dialog" aria-modal="true" aria-label={lesson.title}>
         <button className="lx-close" onClick={onClose} aria-label="Close">✕</button>
@@ -438,6 +439,7 @@ function LessonDetail({ lesson, prog, onClose, onSave }) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
