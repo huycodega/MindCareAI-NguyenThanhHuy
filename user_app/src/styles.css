@@ -6364,3 +6364,24 @@ h1.title { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin-bo
   .page-content { padding: 14px; overflow-x: hidden; }
   .home-hero-v3 { padding: 22px 18px; min-height: auto; }
 }
+
+/* ============================================================
+   Mobile fix v2 — target the REAL chat classes (ai-*) + global
+   horizontal-overflow guard. (Earlier chat-* rules were no-ops.)
+   ============================================================ */
+html, body, #root { overflow-x: hidden; }
+
+@media (max-width: 1024px) {
+  .home-dashboard-v3 { grid-template-columns: 1fr; max-width: 100%; }
+  .home-bottom-grid  { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  /* Chat (AI Support) — keep the conversation inside the viewport */
+  .ai-grid { grid-template-columns: 1fr; max-width: 100%; gap: 0; }
+  .ai-card, .ai-main, .ai-feed, .ai-msg { max-width: 100%; min-width: 0; }
+  .ai-row { max-width: 92%; }
+  .ai-feed { padding: 12px 2px 4px; }
+  .ai-bubble { font-size: 14px; }
+  .ai-inputbar { max-width: 100%; }
+}
