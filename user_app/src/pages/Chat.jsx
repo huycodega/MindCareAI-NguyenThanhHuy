@@ -329,6 +329,24 @@ export default function Chat() {
     } catch { /* ignore */ }
   }
 
+  // Re-sync the open thread when the tab regains focus. Background tabs throttle
+  // the live poll, so when a clinician approves a reply in another tab the user
+  // tab can lag — refreshing on return shows the approved reply without a manual
+  // reload.
+  async function refreshActive() {
+    if (!activeId || busy) return;
+    try {
+      const r = await api.getConversation(activeId);
+      const mapped = mapServerMessages(r.messages);
+      if (mapped.length) setMessages(mapped);
+    } catch { /* ignore */ }
+  }
+  useEffect(() => {
+    const onVis = () => { if (document.visibilityState === "visible") refreshActive(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [activeId, busy]);
+
   function newChat() {
     clearInterval(pollRef.current);
     setMessages(WELCOME);
