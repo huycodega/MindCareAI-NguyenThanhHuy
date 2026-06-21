@@ -39,6 +39,13 @@ export default function TuVan() {
   }
   useEffect(() => { loadAll(); }, []);
 
+  // Light refresh after booking/cancelling — update only the appointments,
+  // without re-fetching the expert list or flashing the loading state.
+  async function refreshAppts() {
+    try { const a = await api.myAppointments(); setAppts(a.appointments || []); }
+    catch { /* ignore */ }
+  }
+
   async function openBooking(expertId, editingId = null) {
     setMsg(null);
     try {
@@ -64,13 +71,13 @@ export default function TuVan() {
         setMsg({ type: "ok", text: "Booked ✓ — pending the expert's confirmation." });
       }
       setBooking(null); setSelDate("");
-      await loadAll();
+      await refreshAppts();
     } catch (e) { setMsg({ type: "err", text: e.message }); }
   }
 
   async function doCancel(a) {
     setConfirmA(null);
-    try { await api.cancelAppointment(a.id); setMsg({ type: "ok", text: "Appointment cancelled." }); await loadAll(); }
+    try { await api.cancelAppointment(a.id); setMsg({ type: "ok", text: "Appointment cancelled." }); await refreshAppts(); }
     catch (e) { setMsg({ type: "err", text: e.message }); }
   }
 
