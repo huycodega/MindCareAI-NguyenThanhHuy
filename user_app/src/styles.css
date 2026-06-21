@@ -6391,10 +6391,13 @@ html, body, #root { overflow-x: hidden; }
   position: fixed; inset: 0; z-index: 200;
   background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(2px);
   display: flex; align-items: flex-start; justify-content: center;
-  padding: 40px 16px; overflow-y: auto; animation: u-fade 0.16s ease;
+  padding: 24px 16px; overflow-y: auto; animation: u-fade 0.16s ease;
 }
 .lx-modal {
   position: relative; width: 100%; max-width: 640px;
+  /* margin:auto centers vertically when it fits, and lets it scroll from the
+     top (with the padding gap) when taller than the viewport. */
+  margin: auto;
   background: var(--surface); border-radius: 18px; border: 1px solid var(--line);
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
   padding: 26px 28px 28px; animation: u-fade 0.2s ease;
