@@ -104,7 +104,7 @@ function NavSvgIcon({ name }) {
   </svg>
 );
 }
-function Topbar({ activePage, onNav, user, onLogout }) {
+function Topbar({ activePage, onNav, user, onLogout, onMenu }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const initials = user?.username ? user.username.slice(0, 1).toUpperCase() : "U";
   const displayName = user?.username
@@ -113,6 +113,12 @@ function Topbar({ activePage, onNav, user, onLogout }) {
 
   return (
     <header className="app-topbar">
+      {/* Hamburger — only shows on mobile (CSS) to open the nav drawer */}
+      <button type="button" className="topbar-hamburger" onClick={onMenu} aria-label="Open menu">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <path d="M4 7h16M4 12h16M4 17h16" />
+        </svg>
+      </button>
       {/* Logo (aligned to sidebar width) — click to go Home */}
       <button
         type="button"
@@ -178,9 +184,11 @@ function Topbar({ activePage, onNav, user, onLogout }) {
   );
 }
 
-function Sidebar({ activePage, onNav }) {
+function Sidebar({ activePage, onNav, open, onClose }) {
   return (
-    <nav className="sidebar">
+    <>
+      {open && <div className="sidebar-backdrop" onClick={onClose} />}
+      <nav className={`sidebar ${open ? "sidebar-open" : ""}`}>
       <div className="sidebar-nav">
         {NAV_ITEMS.map((item) => (
           <button
@@ -210,7 +218,8 @@ function Sidebar({ activePage, onNav }) {
           </svg>
         </div>
       </div>
-    </nav>
+      </nav>
+    </>
   );
 }
 
@@ -219,6 +228,9 @@ export default function App() {
   const [stage, setStage] = useState("loading");
   const [activePage, setActivePage] = useState("dashboard");
   const [showLogin, setShowLogin] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  // Navigate + always close the mobile drawer.
+  const navTo = (id) => { setActivePage(id); setNavOpen(false); };
 
   useEffect(() => {
     if (!user) { setStage("landing"); return; }
@@ -278,7 +290,7 @@ export default function App() {
   if (stage === "intake")  return <Intake  onDone={() => setStage("app")} />;
 
   const pages = {
-    dashboard: <Dashboard user={user} onNav={setActivePage} />,
+    dashboard: <Dashboard user={user} onNav={navTo} />,
     sangloc:   <SangLoc />,
     chat:      <Chat />,
     baihoc:    <BaiHoc />,
@@ -291,10 +303,12 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Topbar activePage={activePage} onNav={setActivePage} user={user} onLogout={logout} />
+      <Topbar activePage={activePage} onNav={navTo} user={user} onLogout={logout}
+              onMenu={() => setNavOpen((o) => !o)} />
 
       <div className="app-body">
-        <Sidebar activePage={activePage} onNav={setActivePage} />
+        <Sidebar activePage={activePage} onNav={navTo}
+                 open={navOpen} onClose={() => setNavOpen(false)} />
 
         <div className={`main-content ${isChatPage ? "chat-mode" : ""}`}>
           {isChatPage ? (
