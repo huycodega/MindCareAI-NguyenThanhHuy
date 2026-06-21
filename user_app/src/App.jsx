@@ -113,11 +113,16 @@ function Topbar({ activePage, onNav, user, onLogout }) {
 
   return (
     <header className="app-topbar">
-      {/* Logo (aligned to sidebar width) */}
-      <div className="topbar-logo-section">
+      {/* Logo (aligned to sidebar width) — click to go Home */}
+      <button
+        type="button"
+        className="topbar-logo-section"
+        onClick={() => onNav("dashboard")}
+        aria-label="Go to Home"
+      >
         <div className="topbar-logo-icon"><Mascot variant="wave" size={30} /></div>
         <span className="topbar-brand">MindCare AI</span>
-      </div>
+      </button>
 
       {/* Center tabs â€” only on Home/Dashboard */}
       {activePage === "dashboard" && (
