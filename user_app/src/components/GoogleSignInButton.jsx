@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 // When it is empty the button renders nothing, so the app still works without
 // Google configured.
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
-const GSI_SRC = "https://accounts.google.com/gsi/client";
+const GSI_SRC = "https://accounts.google.com/gsi/client?hl=en";
 
 export default function GoogleSignInButton({ onCredential, text = "signin_with" }) {
   const ref = useRef(null);
@@ -19,6 +19,7 @@ export default function GoogleSignInButton({ onCredential, text = "signin_with" 
       if (cancelled || !window.google?.accounts?.id || !ref.current) return;
       window.google.accounts.id.initialize({
         client_id: CLIENT_ID,
+        locale: "en",
         callback: (resp) => { if (resp?.credential) cbRef.current?.(resp.credential); },
       });
       ref.current.innerHTML = "";
