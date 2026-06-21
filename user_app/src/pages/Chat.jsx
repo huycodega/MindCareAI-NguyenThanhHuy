@@ -340,6 +340,7 @@ export default function Chat({ onNav }) {
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const pollRef = useRef(null);
+  const pendingRef = useRef(null);  // { sid, idx } while a clinician review is outstanding
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -383,33 +384,60 @@ export default function Chat({ onNav }) {
 
   function newChat() {
     clearInterval(pollRef.current);
+    pollRef.current = null;
+    pendingRef.current = null;
     setMessages(WELCOME);
     setActiveId(null);
     inputRef.current?.focus();
   }
 
+  // Apply a fetched session: when the clinician has answered/rejected, swap the
+  // placeholder bubble for the final reply and stop polling. Returns true once
+  // settled. Only touches the one bubble at `idx`, so it never clobbers input.
+  function applySession(s, idx) {
+    if (s.status !== "answered" && s.status !== "rejected") return false;
+    clearInterval(pollRef.current);
+    pollRef.current = null;
+    pendingRef.current = null;
+    setMessages((prev) => {
+      const next = [...prev];
+      next[idx] = {
+        role: "ai",
+        time: nowTime(),
+        text: s.status === "answered"
+          ? s.final_reply
+          : "A clinician determined a different approach is needed. Please reach out directly for support.",
+      };
+      return next;
+    });
+    return true;
+  }
+
   function startPolling(sid, idx) {
     clearInterval(pollRef.current);
+    pendingRef.current = { sid, idx };
     pollRef.current = setInterval(async () => {
-      try {
-        const s = await api.mySession(sid);
-        if (s.status === "answered" || s.status === "rejected") {
-          clearInterval(pollRef.current);
-          setMessages((prev) => {
-            const next = [...prev];
-            next[idx] = {
-              role: "ai",
-              time: nowTime(),
-              text: s.status === "answered"
-                ? s.final_reply
-                : "A clinician determined a different approach is needed. Please reach out directly for support.",
-            };
-            return next;
-          });
-        }
-      } catch {}
+      try { applySession(await api.mySession(sid), idx); } catch {}
     }, 3000);
   }
+
+  // Background tabs throttle setInterval to ~once a minute (or pause it), so a
+  // clinician reply approved while the user is on another tab/window wouldn't
+  // appear until reload. Re-check the outstanding session the instant the tab
+  // regains focus — covers the "approve in admin, switch back" flow.
+  useEffect(() => {
+    const recheck = async () => {
+      const p = pendingRef.current;
+      if (!p || document.visibilityState !== "visible") return;
+      try { applySession(await api.mySession(p.sid), p.idx); } catch {}
+    };
+    document.addEventListener("visibilitychange", recheck);
+    window.addEventListener("focus", recheck);
+    return () => {
+      document.removeEventListener("visibilitychange", recheck);
+      window.removeEventListener("focus", recheck);
+    };
+  }, []);
 
   async function sendText(raw) {
     const text = (raw ?? input).trim();
