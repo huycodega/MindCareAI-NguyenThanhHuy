@@ -100,15 +100,35 @@ function MsgText({ text }) {
   ));
 }
 
-/* Split the "From your library" footer out of the reply and match each line
-   to a real library item so it can be rendered as a clickable chip. */
+/* Split the "From your library" footer out of the reply. Each footer line is
+   parsed on its own ("- Lesson: Title (dur)" / "- Resource: Title [type]") and
+   matched to a real library item by EXACT title, so the chips shown are exactly
+   the ones attached (in order) — even after a clinician adds/removes some.
+   A line with no matching published item still renders (just not clickable). */
+const REC_LINE_RE = /^\s*-\s*(lesson|resource)\s*:\s*(.+?)\s*(?:\(([^)]*)\)|\[([^\]]*)\])?\s*$/i;
+
 function parseRecs(text, library) {
   const marker = "From your library";
   const idx = (text || "").indexOf(marker);
-  if (idx === -1 || !library || !library.length) return { body: text, recs: [] };
+  if (idx === -1) return { body: text, recs: [] };
   const body = text.slice(0, idx).trim();
   const footer = text.slice(idx);
-  const recs = library.filter((it) => it.title && footer.includes(it.title));
+  const lib = library || [];
+  const recs = [];
+  for (const line of footer.split("\n")) {
+    const m = line.match(REC_LINE_RE);
+    if (!m) continue;
+    const kind = m[1].toLowerCase();
+    const title = m[2].trim();
+    const meta = (m[3] || m[4] || "").trim();
+    const found = lib.find((it) => it.kind === kind && it.title &&
+      it.title.trim().toLowerCase() === title.toLowerCase());
+    recs.push(found || {
+      kind, id: `txt:${kind}:${title}`, title, full: null,
+      duration: kind === "lesson" ? meta : undefined,
+      type: kind === "resource" ? meta : undefined,
+    });
+  }
   return { body: body || text, recs };
 }
 
@@ -130,12 +150,20 @@ function ChatBubble({ msg, library, onOpenRec, onTalkExpert }) {
             <div className="ai-recs">
               <div className="ai-recs-label">📚 From your library</div>
               {recs.map((r) => (
-                <button key={r.kind + r.id} className="ai-rec-chip" onClick={() => onOpenRec(r)}>
-                  <span className="ai-rec-emoji">{r.kind === "lesson" ? "📘" : "📗"}</span>
-                  <span className="ai-rec-title">{r.title}</span>
-                  {(r.duration || r.type) && <span className="ai-rec-meta">{r.duration || r.type}</span>}
-                  <span className="ai-rec-arrow">›</span>
-                </button>
+                r.full ? (
+                  <button key={r.kind + r.id} className="ai-rec-chip" onClick={() => onOpenRec(r)}>
+                    <span className="ai-rec-emoji">{r.kind === "lesson" ? "📘" : "📗"}</span>
+                    <span className="ai-rec-title">{r.title}</span>
+                    {(r.duration || r.type) && <span className="ai-rec-meta">{r.duration || r.type}</span>}
+                    <span className="ai-rec-arrow">›</span>
+                  </button>
+                ) : (
+                  <div key={r.kind + r.id} className="ai-rec-chip ai-rec-chip-static">
+                    <span className="ai-rec-emoji">{r.kind === "lesson" ? "📘" : "📗"}</span>
+                    <span className="ai-rec-title">{r.title}</span>
+                    {(r.duration || r.type) && <span className="ai-rec-meta">{r.duration || r.type}</span>}
+                  </div>
+                )
               ))}
             </div>
           )}
