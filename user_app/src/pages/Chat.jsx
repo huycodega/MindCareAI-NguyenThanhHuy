@@ -410,7 +410,7 @@ export default function Chat() {
       const t0 = Date.now();
       pollRef.current = setInterval(async () => {
         if (settled) { clearInterval(pollRef.current); return; }
-        if (Date.now() - t0 > 15 * 60 * 1000) {
+        if (Date.now() - t0 > 30 * 60 * 1000) {
           show({ role: "ai", time: nowTime(), error: true, text: "This is taking longer than usual — please reload in a moment to see the reply." });
           return;
         }
