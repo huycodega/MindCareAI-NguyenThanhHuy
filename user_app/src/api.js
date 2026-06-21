@@ -103,4 +103,9 @@ export const api = {
     return req(`/resources${q ? `?${q}` : ""}`);
   },
   resource: (rid) => req(`/resources/${rid}`),
+
+  // ---- per-user lesson progress ----
+  lessonProgress: () => req("/my/lesson-progress"),
+  setLessonProgress: (lid, body) =>
+    req(`/my/lesson-progress/${lid}`, { method: "POST", body }),
 };

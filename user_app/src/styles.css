@@ -6385,3 +6385,42 @@ html, body, #root { overflow-x: hidden; }
   .ai-bubble { font-size: 14px; }
   .ai-inputbar { max-width: 100%; }
 }
+
+/* ── Lesson / Resource detail modal (lx-*) ───────────────────────────── */
+.lx-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(2px);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 40px 16px; overflow-y: auto; animation: u-fade 0.16s ease;
+}
+.lx-modal {
+  position: relative; width: 100%; max-width: 640px;
+  background: var(--surface); border-radius: 18px; border: 1px solid var(--line);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
+  padding: 26px 28px 28px; animation: u-fade 0.2s ease;
+}
+.lx-close {
+  position: absolute; top: 14px; right: 14px; width: 34px; height: 34px;
+  border-radius: 9px; border: 1px solid var(--line); background: var(--surface);
+  color: var(--ink-soft); cursor: pointer; font-size: 14px;
+}
+.lx-close:hover { color: var(--danger); border-color: var(--danger); }
+.lx-title { font-size: 20px; font-weight: 800; color: var(--ink); padding-right: 40px; }
+.lx-meta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 8px; font-size: 13px; color: var(--ink-soft); }
+.lx-level { text-transform: capitalize; }
+.lx-progress-row { display: flex; align-items: center; gap: 12px; margin: 16px 0 4px; }
+.lx-progress { flex: 1; height: 8px; border-radius: 99px; background: var(--primary-soft); overflow: hidden; }
+.lx-progress-fill { height: 100%; background: var(--primary); border-radius: 99px; transition: width 0.25s; }
+.lx-progress-pct { font-size: 13px; font-weight: 700; color: var(--primary-dark); white-space: nowrap; }
+.lx-body { margin-top: 14px; }
+.lx-desc { color: var(--ink-soft); font-size: 14.5px; line-height: 1.6; margin-bottom: 16px; }
+.lx-objectives { background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; margin-bottom: 18px; }
+.lx-obj-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; font-weight: 700; color: var(--ink-soft); margin-bottom: 8px; }
+.lx-markall { border: none; background: none; color: var(--primary-dark); font-weight: 700; font-size: 12.5px; cursor: pointer; }
+.lx-obj { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; font-size: 14px; color: var(--ink); cursor: pointer; }
+.lx-obj input { margin-top: 3px; width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; flex-shrink: 0; }
+.lx-obj.checked span { color: var(--ink-soft); text-decoration: line-through; }
+.lx-content p { color: var(--ink); font-size: 14.5px; line-height: 1.7; margin: 0 0 10px; }
+.lx-link { display: inline-flex; align-items: center; gap: 8px; margin-top: 10px; padding: 11px 18px; background: var(--primary); color: #fff; border-radius: 12px; font-weight: 700; text-decoration: none; }
+.lx-link:hover { background: var(--primary-dark); }
+@media (max-width: 640px) { .lx-overlay { padding: 16px 10px; } .lx-modal { padding: 22px 16px; } .lx-title { font-size: 18px; } }
