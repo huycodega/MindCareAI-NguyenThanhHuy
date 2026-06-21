@@ -99,9 +99,24 @@ function MsgText({ text }) {
   ));
 }
 
+/* Split the "From your library" footer out of the reply and match each line
+   to a real library item so it can be rendered as a clickable chip. */
+function parseRecs(text, library) {
+  const marker = "From your library";
+  const idx = (text || "").indexOf(marker);
+  if (idx === -1 || !library || !library.length) return { body: text, recs: [] };
+  const body = text.slice(0, idx).trim();
+  const footer = text.slice(idx);
+  const recs = library.filter((it) => it.title && footer.includes(it.title));
+  return { body: body || text, recs };
+}
+
 /* ── Chat bubble ───────────────────────────────────────────────── */
-function ChatBubble({ msg }) {
+function ChatBubble({ msg, library, onOpenRec }) {
   const isAI = msg.role === "ai";
+  const { body, recs } = isAI
+    ? parseRecs(msg.text, library)
+    : { body: msg.text, recs: [] };
   return (
     <div className={`ai-row ${isAI ? "ai" : "user"}`}>
       {isAI && (
@@ -109,7 +124,20 @@ function ChatBubble({ msg }) {
       )}
       <div className="ai-msg">
         <div className={`ai-bubble ${isAI ? "ai-bubble-ai" : "ai-bubble-user"} ${msg.error ? "ai-bubble-error" : ""}`}>
-          <MsgText text={msg.text} />
+          <MsgText text={body} />
+          {recs.length > 0 && (
+            <div className="ai-recs">
+              <div className="ai-recs-label">📚 From your library</div>
+              {recs.map((r) => (
+                <button key={r.kind + r.id} className="ai-rec-chip" onClick={() => onOpenRec(r)}>
+                  <span className="ai-rec-emoji">{r.kind === "lesson" ? "📘" : "📗"}</span>
+                  <span className="ai-rec-title">{r.title}</span>
+                  {(r.duration || r.type) && <span className="ai-rec-meta">{r.duration || r.type}</span>}
+                  <span className="ai-rec-arrow">›</span>
+                </button>
+              ))}
+            </div>
+          )}
           {(msg.resources || msg.crisis) && (
             <div className="ai-bubble-hotline">
               <Icon name="phone" size={16} />
@@ -301,6 +329,8 @@ export default function Chat() {
   const [messages, setMessages] = useState(WELCOME);
   const [activeId, setActiveId] = useState(null);
   const [conversations, setConversations] = useState([]);
+  const [library, setLibrary] = useState([]);     // lessons+resources for clickable recs
+  const [recDetail, setRecDetail] = useState(null);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
   const pollRef = useRef(null);
@@ -308,6 +338,21 @@ export default function Chat() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Load the library once so "From your library" recommendations can be matched
+  // to real lessons/resources and opened on tap.
+  useEffect(() => {
+    let alive = true;
+    Promise.all([api.lessons().catch(() => ({})), api.resources().catch(() => ({}))])
+      .then(([L, R]) => {
+        if (!alive) return;
+        setLibrary([
+          ...(L.lessons || []).map((l) => ({ kind: "lesson", id: l.id, title: l.title, duration: l.duration, full: l })),
+          ...(R.resources || []).map((r) => ({ kind: "resource", id: r.id, title: r.title, type: r.type, full: r })),
+        ]);
+      });
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => () => clearInterval(pollRef.current), []);
 
@@ -490,7 +535,7 @@ export default function Chat() {
             {!messages.some((m) => m.role === "user") && messages.length <= 1 ? (
               <EmptyState greeting={messages[0]?.text || WELCOME[0].text} />
             ) : (
-              messages.map((m, i) => (m.typing ? <TypingBubble key={i} /> : <ChatBubble key={i} msg={m} />))
+              messages.map((m, i) => (m.typing ? <TypingBubble key={i} /> : <ChatBubble key={i} msg={m} library={library} onOpenRec={(r) => setRecDetail(r)} />))
             )}
             <div ref={bottomRef} />
           </div>
@@ -537,6 +582,61 @@ export default function Chat() {
           onOpen={openConversation}
           onNew={newChat}
         />
+      </div>
+
+      {recDetail && <RecDetail rec={recDetail} onClose={() => setRecDetail(null)} />}
+    </div>
+  );
+}
+
+/* ── Read-only detail for a recommended lesson/resource (reuses lx-* CSS) ── */
+function RecDetail({ rec, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const d = rec.full || {};
+  const isLesson = rec.kind === "lesson";
+  const objectives = d.objectives || [];
+
+  return (
+    <div className="lx-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="lx-modal" role="dialog" aria-modal="true" aria-label={d.title}>
+        <button className="lx-close" onClick={onClose} aria-label="Close">✕</button>
+        <div className="lx-head">
+          <h2 className="lx-title">{d.title}</h2>
+          <div className="lx-meta">
+            {d.duration && <span>🕐 {d.duration}</span>}
+            {isLesson
+              ? (d.level && <span className="lx-level">{d.level}</span>)
+              : (d.type && <span>{d.type}</span>)}
+            {d.category && <span>{d.category}</span>}
+          </div>
+        </div>
+        <div className="lx-body">
+          {d.description && <p className="lx-desc">{d.description}</p>}
+          {isLesson && objectives.length > 0 && (
+            <div className="lx-objectives">
+              <div className="lx-obj-head"><span>Learning objectives</span></div>
+              {objectives.map((o, i) => (
+                <div key={i} className="lx-obj"><span>• {o}</span></div>
+              ))}
+            </div>
+          )}
+          {d.content && (
+            <div className="lx-content">
+              {d.content.split("\n").map((line, i) =>
+                line.trim() ? <p key={i}>{line}</p> : <br key={i} />)}
+            </div>
+          )}
+          {!isLesson && d.url && (
+            <a className="lx-link" href={d.url} target="_blank" rel="noopener noreferrer">
+              {d.type === "Audio" ? "▶ Listen" : d.type === "Video" ? "▶ Watch" : "Open ↗"}
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );
