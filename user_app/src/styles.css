@@ -6439,3 +6439,75 @@ html, body, #root { overflow-x: hidden; }
 .ai-rec-title { flex: 1; font-size: 13.5px; font-weight: 600; color: var(--ink); }
 .ai-rec-meta { font-size: 12px; color: var(--ink-soft); white-space: nowrap; flex-shrink: 0; }
 .ai-rec-arrow { color: var(--primary); font-size: 18px; flex-shrink: 0; }
+
+/* ── Counselling (Tư vấn) page ─────────────────────────────────────────── */
+.tv-page { max-width: 1000px; margin: 0 auto; }
+.tv-header h1 { font-size: 24px; font-weight: 800; color: var(--ink); }
+.tv-header p { color: var(--ink-soft); font-size: 14px; margin-top: 4px; max-width: 620px; }
+.tv-banner { margin: 16px 0; padding: 11px 14px; border-radius: 12px; font-size: 13.5px; font-weight: 600; }
+.tv-banner.ok { background: var(--primary-soft); color: var(--primary-dark); }
+.tv-banner.err { background: #fde8e8; color: #b91c1c; }
+.tv-section { margin-top: 22px; }
+.tv-h2 { font-size: 17px; font-weight: 800; color: var(--ink); margin-bottom: 12px; }
+.tv-muted { color: var(--ink-soft); font-size: 14px; }
+
+.tv-experts { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.tv-expert { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; box-shadow: var(--shadow-sm); }
+.tv-expert-top { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.tv-avatar { width: 46px; height: 46px; border-radius: 14px; background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; font-weight: 800; font-size: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.tv-expert-name { font-weight: 800; color: var(--ink); }
+.tv-expert-spec { font-size: 12.5px; color: var(--primary-dark); font-weight: 600; }
+.tv-expert-exp { font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin-bottom: 8px; }
+.tv-expert-phone { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 12px; }
+.tv-btn-primary { width: 100%; padding: 10px; border: none; border-radius: 11px; background: var(--primary); color: #fff; font-weight: 700; font-size: 14px; cursor: pointer; }
+.tv-btn-primary:hover { background: var(--primary-dark); }
+
+.tv-appts { display: flex; flex-direction: column; gap: 10px; }
+.tv-appt { display: flex; justify-content: space-between; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; flex-wrap: wrap; }
+.tv-appt-name { font-weight: 700; color: var(--ink); }
+.tv-appt-spec { color: var(--ink-soft); font-weight: 500; font-size: 13px; }
+.tv-appt-when { font-size: 13.5px; color: var(--ink); margin-top: 4px; }
+.tv-appt-phone { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
+.tv-appt-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.tv-appt-actions { display: flex; gap: 8px; }
+.tv-btn-ghost { padding: 6px 12px; border: 1px solid var(--line); background: var(--surface); border-radius: 9px; font-size: 12.5px; font-weight: 700; color: var(--ink); cursor: pointer; }
+.tv-btn-ghost:hover { border-color: var(--primary); color: var(--primary-dark); }
+.tv-btn-ghost.danger { color: #b91c1c; }
+.tv-btn-ghost.danger:hover { border-color: #ef4444; background: #fde8e8; }
+.tv-locked { font-size: 11.5px; color: var(--ink-soft); }
+.tv-pill { font-size: 11.5px; font-weight: 800; padding: 3px 10px; border-radius: 999px; text-transform: capitalize; }
+.tv-pill.pending { background: #fef3c7; color: #b45309; }
+.tv-pill.accepted { background: var(--primary-soft); color: var(--primary-dark); }
+.tv-pill.cancelled, .tv-pill.declined { background: #f1f5f9; color: #64748b; }
+
+/* booking calendar (inside lx-modal) */
+.tv-modal { max-width: 560px; }
+.tv-cal { margin-top: 16px; }
+.tv-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.tv-cal-head { margin-bottom: 6px; }
+.tv-cal-wd { text-align: center; font-size: 11px; font-weight: 700; color: var(--ink-soft); }
+.tv-day { position: relative; aspect-ratio: 1; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: var(--ink); transition: all 0.12s; }
+.tv-day:hover:not(:disabled) { border-color: var(--primary); background: var(--primary-light); }
+.tv-day.sel { background: var(--primary); border-color: var(--primary); color: #fff; }
+.tv-day.full { background: #fde8e8; border-color: #f6c6c6; color: #c0494a; cursor: not-allowed; }
+.tv-day-dot { position: absolute; bottom: 6px; width: 5px; height: 5px; border-radius: 50%; background: var(--primary); }
+.tv-day.sel .tv-day-dot { background: #fff; }
+.tv-cal-legend { display: flex; gap: 16px; margin-top: 10px; font-size: 12px; color: var(--ink-soft); }
+.tv-lg { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-right: 5px; vertical-align: -1px; }
+.tv-lg.free { background: var(--surface); border: 1px solid var(--line); }
+.tv-lg.full { background: #fde8e8; border: 1px solid #f6c6c6; }
+.tv-slots-wrap { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+.tv-slots-label { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+.tv-slots { display: flex; flex-wrap: wrap; gap: 8px; }
+.tv-slot { padding: 9px 16px; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; font-size: 14px; font-weight: 700; color: var(--primary-dark); cursor: pointer; }
+.tv-slot:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+@media (max-width: 640px) { .tv-appt-side { align-items: flex-start; width: 100%; } }
+
+/* Crisis (L0) "talk to a psychologist" call-to-action in chat */
+.ai-expert-cta {
+  display: inline-flex; align-items: center; gap: 8px; margin-top: 10px;
+  padding: 10px 16px; border-radius: 12px; border: none;
+  background: var(--primary); color: #fff; font-weight: 700; font-size: 14px;
+  cursor: pointer;
+}
+.ai-expert-cta:hover { background: var(--primary-dark); }

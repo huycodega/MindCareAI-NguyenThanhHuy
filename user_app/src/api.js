@@ -108,4 +108,15 @@ export const api = {
   lessonProgress: () => req("/my/lesson-progress"),
   setLessonProgress: (lid, body) =>
     req(`/my/lesson-progress/${lid}`, { method: "POST", body }),
+
+  // ---- expert consultation ----
+  experts: () => req("/experts"),
+  expertAvailability: (eid) => req(`/experts/${eid}/availability`),
+  bookAppointment: (body) =>
+    req("/appointments", { method: "POST", body }),
+  myAppointments: () => req("/my/appointments"),
+  changeAppointment: (aid, body) =>
+    req(`/my/appointments/${aid}`, { method: "PATCH", body }),
+  cancelAppointment: (aid) =>
+    req(`/my/appointments/${aid}`, { method: "DELETE" }),
 };

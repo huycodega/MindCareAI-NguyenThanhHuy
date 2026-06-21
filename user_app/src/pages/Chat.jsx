@@ -112,7 +112,7 @@ function parseRecs(text, library) {
 }
 
 /* ── Chat bubble ───────────────────────────────────────────────── */
-function ChatBubble({ msg, library, onOpenRec }) {
+function ChatBubble({ msg, library, onOpenRec, onTalkExpert }) {
   const isAI = msg.role === "ai";
   const { body, recs } = isAI
     ? parseRecs(msg.text, library)
@@ -137,6 +137,11 @@ function ChatBubble({ msg, library, onOpenRec }) {
                 </button>
               ))}
             </div>
+          )}
+          {(msg.resources || msg.crisis) && onTalkExpert && (
+            <button className="ai-expert-cta" onClick={onTalkExpert}>
+              🧑‍⚕️ Talk to a psychologist →
+            </button>
           )}
           {(msg.resources || msg.crisis) && (
             <div className="ai-bubble-hotline">
@@ -323,7 +328,7 @@ function RightPanel({ onUseTip, conversations, activeId, onOpen, onNew }) {
 }
 
 /* ── Page ──────────────────────────────────────────────────────── */
-export default function Chat() {
+export default function Chat({ onNav }) {
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [messages, setMessages] = useState(WELCOME);
@@ -535,7 +540,7 @@ export default function Chat() {
             {!messages.some((m) => m.role === "user") && messages.length <= 1 ? (
               <EmptyState greeting={messages[0]?.text || WELCOME[0].text} />
             ) : (
-              messages.map((m, i) => (m.typing ? <TypingBubble key={i} /> : <ChatBubble key={i} msg={m} library={library} onOpenRec={(r) => setRecDetail(r)} />))
+              messages.map((m, i) => (m.typing ? <TypingBubble key={i} /> : <ChatBubble key={i} msg={m} library={library} onOpenRec={(r) => setRecDetail(r)} onTalkExpert={onNav ? () => onNav("tuvan") : null} />))
             )}
             <div ref={bottomRef} />
           </div>

@@ -11,6 +11,7 @@ import SangLoc from "./pages/SangLoc.jsx";
 import HoSo from "./pages/HoSo.jsx";
 import BaiHoc from "./pages/BaiHoc.jsx";
 import TaiNguyen from "./pages/TaiNguyen.jsx";
+import TuVan from "./pages/TuVan.jsx";
 import CaiDat from "./pages/CaiDat.jsx";
 
 const NAV_ITEMS = [
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { id: "chat", icon: "bot", label: "AI Support" },
   { id: "baihoc", icon: "book", label: "Lessons" },
   { id: "tainguyen", icon: "folder", label: "Resources" },
+  { id: "tuvan", icon: "expert", label: "Counselling" },
   { id: "hoso", icon: "user", label: "Profile" },
   { id: "caidat", icon: "settings", label: "Settings" },
 ];
@@ -86,6 +88,15 @@ function NavSvgIcon({ name }) {
       <svg {...common} className="nav-svg-icon">
         <path d="M3.5 6.5h6l2 2H20.5v10h-17v-12Z" />
         <path d="M3.5 8.5h17" />
+      </svg>
+    );
+  }
+  if (name === "expert") {
+    return (
+      <svg {...common} className="nav-svg-icon">
+        <circle cx="9" cy="8" r="3.2" />
+        <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
+        <path d="M16 4.5c1.6-1.4 4-0.3 4 1.7 0 1.6-2 3-4 4.3-2-1.3-4-2.7-4-4.3 0-2 2.4-3.1 4-1.7Z" />
       </svg>
     );
   }
@@ -292,10 +303,11 @@ export default function App() {
   const pages = {
     dashboard: <Dashboard user={user} onNav={navTo} />,
     sangloc:   <SangLoc />,
-    chat:      <Chat />,
+    chat:      <Chat onNav={navTo} />,
     baihoc:    <BaiHoc />,
     hoso:      <HoSo user={user} />,
     tainguyen: <TaiNguyen />,
+    tuvan:     <TuVan />,
     caidat:    <CaiDat user={user} onLogout={logout} />,
   };
 
