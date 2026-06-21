@@ -357,7 +357,7 @@ export default function Chat() {
           });
         }
       } catch {}
-    }, 4000);
+    }, 3000);
   }
 
   async function sendText(raw) {
@@ -420,7 +420,7 @@ export default function Chat() {
           const fresh = (r.sessions || []).find((x) => !knownIds.has(x.id));
           if (fresh) await fromSession(fresh);
         } catch {}
-      }, 5000);
+      }, 3000);
     };
     // Give the direct request a head start; only poll if it's slow.
     const pollStartTimer = setTimeout(startReplyPoll, 12000);
