@@ -151,7 +151,7 @@ export default function TuVan() {
 
       {/* Cancel confirmation (in-app, not the browser dialog) */}
       {confirmA && (
-        <div className="lx-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmA(null); }}>
+        <div className="lx-overlay lx-overlay-center" onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmA(null); }}>
           <div className="lx-modal tv-confirm" role="dialog" aria-modal="true">
             <h2 className="lx-title">Cancel this appointment?</h2>
             <p className="lx-desc">
