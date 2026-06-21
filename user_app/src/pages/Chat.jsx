@@ -186,20 +186,19 @@ function recommendExpert(experts, contextText) {
   return best;
 }
 
-/* Flatten an expert's availability into the next free date+slot options. */
-function upcomingSlots(avail, limit = 8) {
+/* Group an expert's free times by day across the whole booking window, so the
+   user can scroll through every available day (not just the first few). */
+function freeSlotsByDay(avail) {
   if (!avail || !avail.window) return [];
   const taken = new Set((avail.booked || []).map((b) => `${b.date} ${b.slot}`));
   const slots = avail.expert?.slots || [];
   const out = [];
   const start = new Date(avail.window.from + "T00:00:00");
   const end = new Date(avail.window.to + "T00:00:00");
-  for (let d = new Date(start); d <= end && out.length < limit; d.setDate(d.getDate() + 1)) {
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
     const ds = isoDate(d);
-    for (const sl of slots) {
-      if (out.length >= limit) break;
-      if (!taken.has(`${ds} ${sl}`)) out.push({ date: ds, slot: sl });
-    }
+    const free = slots.filter((sl) => !taken.has(`${ds} ${sl}`));
+    if (free.length) out.push({ date: ds, slots: free });
   }
   return out;
 }
@@ -322,7 +321,7 @@ function ExpertCard({ e, recommended, onPick }) {
 
 function ExpertBookingCard({ state, onPickExpert, onPickSlot, onBack, onCancel }) {
   const { step, loading, experts = [], expert, avail, booking, error, recommended } = state;
-  const slots = step === "slots" ? upcomingSlots(avail, 8) : [];
+  const days = step === "slots" ? freeSlotsByDay(avail) : [];
   const others = recommended
     ? experts.filter((e) => e.id !== recommended.expert.id)
     : experts;
@@ -364,15 +363,22 @@ function ExpertBookingCard({ state, onPickExpert, onPickSlot, onBack, onCancel }
             <>
               <div className="ai-book-title">Pick a time with <strong>{expert?.name}</strong> (next 3 weeks):</div>
               {loading ? <div className="ai-book-loading">Loading available times…</div> : (
-                slots.length === 0 ? (
+                days.length === 0 ? (
                   <div className="ai-book-empty">No free slots in the next 3 weeks — try another psychologist.</div>
                 ) : (
-                  <div className="ai-book-slots">
-                    {slots.map((s) => (
-                      <button key={s.date + s.slot} className="ai-book-slot" disabled={booking}
-                              onClick={() => onPickSlot(s.date, s.slot)}>
-                        {fmtApptDate(s.date)} · {s.slot}
-                      </button>
+                  <div className="ai-book-days">
+                    {days.map((g) => (
+                      <div key={g.date} className="ai-book-day">
+                        <div className="ai-book-day-label">{fmtApptDate(g.date)}</div>
+                        <div className="ai-book-slots">
+                          {g.slots.map((sl) => (
+                            <button key={sl} className="ai-book-slot" disabled={booking}
+                                    onClick={() => onPickSlot(g.date, sl)}>
+                              {sl}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )
