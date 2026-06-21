@@ -143,15 +143,15 @@ function fmtApptDate(iso) {
 }
 /* Match the user's recent context to a psychologist's specialty so the agent
    can recommend the most relevant expert (the user can still pick anyone). */
+// Recommendation is driven by the user's emotional CONTENT, not by the crisis
+// flag itself (suicidal risk is handled by the hotline + deterministic gate,
+// and does NOT imply a "trauma" specialist). So no crisis→specialty mapping.
 const BOOK_THEMES = [
-  { label: "crisis & safety", weight: 3,
-    triggers: ["suicid", "kill myself", "end my life", "end it all", "self-harm", "self harm", "hurt myself", "no reason to live", "can't go on", "cant go on", "want to die"],
-    specialty: ["crisis", "suicide", "risk", "trauma", "safety"] },
   { label: "anxiety & panic", weight: 1,
-    triggers: ["anxious", "anxiety", "panic", "worry", "worried", "nervous", "on edge", "overwhelm", "racing thoughts", "can't breathe", "cant breathe"],
+    triggers: ["anxious", "anxiety", "panic", "worry", "worried", "nervous", "on edge", "overwhelm", "racing thoughts", "chest tightens", "can't breathe", "cant breathe", "freeze up"],
     specialty: ["anxiety", "panic", "stress"] },
   { label: "depression & low mood", weight: 1,
-    triggers: ["sad", "depress", "hopeless", "empty", "worthless", "numb", "low mood", "no energy", "pointless", "exhausted", "cry", "down"],
+    triggers: ["sad", "depress", "hopeless", "empty", "worthless", "numb", "low mood", "no energy", "pointless", "cry", "down"],
     specialty: ["depress", "mood", "low mood"] },
   { label: "trauma", weight: 2,
     triggers: ["trauma", "abuse", "assault", "ptsd", "flashback", "nightmare"],
