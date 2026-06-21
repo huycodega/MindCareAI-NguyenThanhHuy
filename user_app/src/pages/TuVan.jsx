@@ -26,6 +26,7 @@ export default function TuVan() {
   const [booking, setBooking] = useState(null);   // { expert, avail, editingId }
   const [selDate, setSelDate] = useState("");
   const [msg, setMsg] = useState(null);           // { type, text }
+  const [confirmA, setConfirmA] = useState(null); // appointment pending cancel
 
   async function loadAll() {
     setLoading(true);
@@ -67,10 +68,10 @@ export default function TuVan() {
     } catch (e) { setMsg({ type: "err", text: e.message }); }
   }
 
-  async function cancel(a) {
-    if (!window.confirm("Cancel this appointment?")) return;
-    try { await api.cancelAppointment(a.id); await loadAll(); }
-    catch (e) { alert(e.message); }
+  async function doCancel(a) {
+    setConfirmA(null);
+    try { await api.cancelAppointment(a.id); setMsg({ type: "ok", text: "Appointment cancelled." }); await loadAll(); }
+    catch (e) { setMsg({ type: "err", text: e.message }); }
   }
 
   return (
@@ -100,7 +101,7 @@ export default function TuVan() {
                   {a.status === "pending" && (
                     <div className="tv-appt-actions">
                       <button className="tv-btn-ghost" onClick={() => openBooking(a.psychologist_id, a.id)}>Change</button>
-                      <button className="tv-btn-ghost danger" onClick={() => cancel(a)}>Cancel</button>
+                      <button className="tv-btn-ghost danger" onClick={() => setConfirmA(a)}>Cancel</button>
                     </div>
                   )}
                   {a.status === "accepted" && <span className="tv-locked">Confirmed — contact the expert to change</span>}
@@ -146,6 +147,23 @@ export default function TuVan() {
           onPick={pickSlot}
           onClose={() => { setBooking(null); setSelDate(""); }}
         />
+      )}
+
+      {/* Cancel confirmation (in-app, not the browser dialog) */}
+      {confirmA && (
+        <div className="lx-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmA(null); }}>
+          <div className="lx-modal tv-confirm" role="dialog" aria-modal="true">
+            <h2 className="lx-title">Cancel this appointment?</h2>
+            <p className="lx-desc">
+              {confirmA.psychologist?.name} · {fmtDate(confirmA.date)} at {confirmA.slot}.
+              This can't be undone, but you can book again anytime.
+            </p>
+            <div className="tv-confirm-actions">
+              <button className="tv-btn-ghost" onClick={() => setConfirmA(null)}>Keep it</button>
+              <button className="tv-btn-danger" onClick={() => doCancel(confirmA)}>Yes, cancel</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
