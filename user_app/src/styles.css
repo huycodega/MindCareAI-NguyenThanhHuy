@@ -6390,14 +6390,15 @@ html, body, #root { overflow-x: hidden; }
 .lx-overlay {
   position: fixed; inset: 0; z-index: 200;
   background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(2px);
-  display: flex; align-items: flex-start; justify-content: center;
+  display: flex; align-items: center; justify-content: center;
   padding: 24px 16px; overflow-y: auto; animation: u-fade 0.16s ease;
 }
 .lx-modal {
   position: relative; width: 100%; max-width: 640px;
-  /* margin:auto centers vertically when it fits, and lets it scroll from the
-     top (with the padding gap) when taller than the viewport. */
-  margin: auto;
+  /* Cap the height to the viewport and scroll the content INSIDE the modal,
+     so a tall modal stays centered with its title reachable (avoids the
+     flex margin:auto top-clipping bug). */
+  max-height: calc(100vh - 48px); overflow-y: auto;
   background: var(--surface); border-radius: 18px; border: 1px solid var(--line);
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.28);
   padding: 26px 28px 28px; animation: u-fade 0.2s ease;
