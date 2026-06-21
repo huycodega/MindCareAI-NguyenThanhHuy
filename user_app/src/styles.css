@@ -6337,3 +6337,30 @@ h1.title { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin-bo
   margin-top: 8px;
   padding-top: 16px;
 }
+
+/* ============================================================
+   Mobile polish — appended last so these win the cascade.
+   Fixes: dashboard 2-col not collapsing, chat horizontal overflow.
+   ============================================================ */
+@media (max-width: 900px) {
+  .home-dashboard-v3 { grid-template-columns: 1fr; max-width: 100%; }
+  .home-bottom-grid  { grid-template-columns: 1fr; }
+  .home-side-v3      { width: 100%; }
+}
+@media (max-width: 640px) {
+  html, body, #root { overflow-x: hidden; max-width: 100%; }
+  .app-shell, .app-body, .main-content { max-width: 100vw; }
+
+  /* Chat: keep everything inside the viewport */
+  .chat-page { padding: 12px; }
+  .chat-page .page-hero { padding: 14px 16px; min-height: auto; }
+  .chat-page .page-hero-mascot { display: none; }
+  .chat-page .page-hero-sub { max-width: 100%; }
+  .chat-feed { padding: 14px 0 8px; }
+  .bubble { padding: 4px 10px; }
+  .bubble-user .bubble-body, .bubble-ai .bubble-body { max-width: 88%; }
+
+  /* General pages */
+  .page-content { padding: 14px; overflow-x: hidden; }
+  .home-hero-v3 { padding: 22px 18px; min-height: auto; }
+}
