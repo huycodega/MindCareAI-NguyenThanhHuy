@@ -50,6 +50,11 @@ export const api = {
       method: "POST",
       body: { username, password, expected_role: EXPECTED_ROLE },
     }),
+  googleAuth: (credential) =>
+    req("/auth/google", {
+      method: "POST",
+      body: { credential, expected_role: EXPECTED_ROLE },
+    }),
   register: (email, password) =>
     req("/register", { method: "POST", body: { email, password } }),
   verifyOtp: (email, otp) =>
