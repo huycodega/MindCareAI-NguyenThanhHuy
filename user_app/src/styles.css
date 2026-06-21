@@ -6530,6 +6530,13 @@ html, body, #root { overflow-x: hidden; }
 .ai-book-loading, .ai-book-empty { font-size: 13px; color: var(--ink-soft); padding: 4px 0; }
 .ai-book-error { font-size: 12.5px; color: var(--danger); margin-top: 8px; }
 .ai-book-experts { display: flex; flex-direction: column; gap: 8px; }
+.ai-book-reco { margin-bottom: 12px; }
+.ai-book-reco-label {
+  font-size: 12px; font-weight: 700; color: var(--primary-dark);
+  margin-bottom: 6px; text-transform: capitalize;
+}
+.ai-book-expert-reco { border-color: var(--primary); background: var(--primary-light); box-shadow: 0 0 0 1px var(--primary) inset; }
+.ai-book-others-label { font-size: 11.5px; font-weight: 600; color: var(--ink-soft); margin-bottom: 2px; }
 .ai-book-expert {
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
   padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line);

@@ -141,6 +141,48 @@ function fmtApptDate(iso) {
   return new Date(iso + "T00:00:00").toLocaleDateString("en-GB",
     { weekday: "short", day: "numeric", month: "short" });
 }
+/* Match the user's recent context to a psychologist's specialty so the agent
+   can recommend the most relevant expert (the user can still pick anyone). */
+const BOOK_THEMES = [
+  { label: "crisis & safety", weight: 3,
+    triggers: ["suicid", "kill myself", "end my life", "end it all", "self-harm", "self harm", "hurt myself", "no reason to live", "can't go on", "cant go on", "want to die"],
+    specialty: ["crisis", "suicide", "risk", "trauma", "safety"] },
+  { label: "anxiety & panic", weight: 1,
+    triggers: ["anxious", "anxiety", "panic", "worry", "worried", "nervous", "on edge", "overwhelm", "racing thoughts", "can't breathe", "cant breathe"],
+    specialty: ["anxiety", "panic", "stress"] },
+  { label: "depression & low mood", weight: 1,
+    triggers: ["sad", "depress", "hopeless", "empty", "worthless", "numb", "low mood", "no energy", "pointless", "exhausted", "cry", "down"],
+    specialty: ["depress", "mood", "low mood"] },
+  { label: "trauma", weight: 2,
+    triggers: ["trauma", "abuse", "assault", "ptsd", "flashback", "nightmare"],
+    specialty: ["trauma", "ptsd"] },
+  { label: "grief & loss", weight: 2,
+    triggers: ["grief", "loss", "passed away", "died", "bereave", "mourning"],
+    specialty: ["grief", "loss", "bereave"] },
+  { label: "relationships", weight: 1,
+    triggers: ["relationship", "partner", "breakup", "broke up", "divorce", "family", "lonely", "alone"],
+    specialty: ["relationship", "family", "couple"] },
+  { label: "sleep", weight: 1,
+    triggers: ["sleep", "insomnia", "can't sleep", "cant sleep", "awake at night"],
+    specialty: ["sleep", "insomnia"] },
+];
+
+function recommendExpert(experts, contextText) {
+  const ctx = (contextText || "").toLowerCase();
+  const active = BOOK_THEMES.filter((t) => t.triggers.some((w) => ctx.includes(w)));
+  if (!active.length) return null;
+  let best = null;
+  for (const e of experts || []) {
+    const hay = `${e.specialty || ""} ${e.bio || ""} ${e.experience || ""}`.toLowerCase();
+    let score = 0, label = null;
+    for (const t of active) {
+      if (t.specialty.some((w) => hay.includes(w))) { score += t.weight; if (!label) label = t.label; }
+    }
+    if (score > 0 && (!best || score > best.score)) best = { expert: e, score, reason: `specializes in ${label}` };
+  }
+  return best;
+}
+
 /* Flatten an expert's availability into the next free date+slot options. */
 function upcomingSlots(avail, limit = 8) {
   if (!avail || !avail.window) return [];
@@ -262,9 +304,25 @@ function TypingBubble() {
 
 /* In-chat psychologist booking: pick an expert → pick a free time → booked.
    Rendered as an assistant card at the foot of the feed (transient). */
+function ExpertCard({ e, recommended, onPick }) {
+  return (
+    <button className={`ai-book-expert${recommended ? " ai-book-expert-reco" : ""}`} onClick={() => onPick(e)}>
+      <span className="ai-book-avatar">{e.name.slice(0, 1).toUpperCase()}</span>
+      <span className="ai-book-exp-info">
+        <span className="ai-book-exp-name">{e.name}</span>
+        <span className="ai-book-exp-spec">{e.specialty || "Counselling"}{e.experience ? ` · ${e.experience}` : ""}</span>
+      </span>
+      <span className="ai-rec-arrow">›</span>
+    </button>
+  );
+}
+
 function ExpertBookingCard({ state, onPickExpert, onPickSlot, onBack, onCancel }) {
-  const { step, loading, experts = [], expert, avail, booking, error } = state;
+  const { step, loading, experts = [], expert, avail, booking, error, recommended } = state;
   const slots = step === "slots" ? upcomingSlots(avail, 8) : [];
+  const others = recommended
+    ? experts.filter((e) => e.id !== recommended.expert.id)
+    : experts;
   return (
     <div className="ai-row ai">
       <div className="ai-avatar"><Mascot variant="chat" size={30} className="mascot-idle" /></div>
@@ -277,18 +335,22 @@ function ExpertBookingCard({ state, onPickExpert, onPickSlot, onBack, onCancel }
                 experts.length === 0 ? (
                   <div className="ai-book-empty">No psychologists are available right now — please use the hotline above.</div>
                 ) : (
-                  <div className="ai-book-experts">
-                    {experts.map((e) => (
-                      <button key={e.id} className="ai-book-expert" onClick={() => onPickExpert(e)}>
-                        <span className="ai-book-avatar">{e.name.slice(0, 1).toUpperCase()}</span>
-                        <span className="ai-book-exp-info">
-                          <span className="ai-book-exp-name">{e.name}</span>
-                          <span className="ai-book-exp-spec">{e.specialty || "Counselling"}{e.experience ? ` · ${e.experience}` : ""}</span>
-                        </span>
-                        <span className="ai-rec-arrow">›</span>
-                      </button>
-                    ))}
-                  </div>
+                  <>
+                    {recommended && (
+                      <div className="ai-book-reco">
+                        <div className="ai-book-reco-label">✨ Recommended for you — {recommended.reason}</div>
+                        <ExpertCard e={recommended.expert} recommended onPick={onPickExpert} />
+                      </div>
+                    )}
+                    {others.length > 0 && (
+                      <div className="ai-book-experts">
+                        {recommended && <div className="ai-book-others-label">Or choose another psychologist</div>}
+                        {others.map((e) => (
+                          <ExpertCard key={e.id} e={e} onPick={onPickExpert} />
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )
               )}
               <button className="ai-book-cancel" onClick={onCancel}>Not now</button>
@@ -535,7 +597,10 @@ export default function Chat({ onNav }) {
       const r = await api.experts();
       const experts = r.experts || [];
       if (!experts.length && onNav) { setExpertBooking(null); onNav("tuvan"); return; }
-      setExpertBooking({ step: "experts", loading: false, experts });
+      // Recommend the expert whose specialty best fits the user's recent words.
+      const ctx = messages.filter((m) => m.role === "user").slice(-5).map((m) => m.text).join(" ");
+      const recommended = recommendExpert(experts, ctx);
+      setExpertBooking({ step: "experts", loading: false, experts, recommended });
     } catch {
       setExpertBooking(null);
       if (onNav) onNav("tuvan");   // fall back to the full Counselling page
