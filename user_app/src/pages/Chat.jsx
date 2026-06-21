@@ -146,13 +146,16 @@ function fmtApptDate(iso) {
 // Recommendation is driven by the user's emotional CONTENT, not by the crisis
 // flag itself (suicidal risk is handled by the hotline + deterministic gate,
 // and does NOT imply a "trauma" specialist). So no crisis→specialty mapping.
+// specialty[] uses short stems so it tolerates typos / variants in the
+// admin-entered specialty text (e.g. "anxi" matches "Anxiety", "Anxitey",
+// "anxious"; "depress" matches "Depression").
 const BOOK_THEMES = [
   { label: "anxiety & panic", weight: 1,
-    triggers: ["anxious", "anxiety", "panic", "worry", "worried", "nervous", "on edge", "overwhelm", "racing thoughts", "chest tightens", "can't breathe", "cant breathe", "freeze up"],
-    specialty: ["anxiety", "panic", "stress"] },
+    triggers: ["anxious", "anxiety", "anxiet", "panic", "worry", "worried", "nervous", "on edge", "overwhelm", "racing thoughts", "chest tightens", "can't breathe", "cant breathe", "freeze up"],
+    specialty: ["anxi", "panic", "stress"] },
   { label: "depression & low mood", weight: 1,
     triggers: ["sad", "depress", "hopeless", "empty", "worthless", "numb", "low mood", "no energy", "pointless", "cry", "down"],
-    specialty: ["depress", "mood", "low mood"] },
+    specialty: ["depress", "mood"] },
   { label: "trauma", weight: 2,
     triggers: ["trauma", "abuse", "assault", "ptsd", "flashback", "nightmare"],
     specialty: ["trauma", "ptsd"] },
