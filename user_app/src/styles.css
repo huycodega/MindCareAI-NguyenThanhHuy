@@ -808,7 +808,12 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
 /* Hero */
 .landing-hero {
   position: relative;
-  background: linear-gradient(180deg, #EDFBF6 0%, #F5FCFA 45%, #FFFFFF 100%);
+  /* watercolor backdrop with a soft white veil so the headline stays crisp and
+     it fades cleanly into the white section below */
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.22) 0%, rgba(255,255,255,0.14) 58%, #FFFFFF 100%),
+    url("/app-bg.png") no-repeat center bottom;
+  background-size: auto, cover;
   padding: 96px 0 84px;
   overflow: hidden;
 }
@@ -822,7 +827,7 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
   position: absolute;
   border-radius: 50%;
   filter: blur(60px);
-  opacity: 0.55;
+  opacity: 0.38;   /* softened so the watercolor reads through without clutter */
 }
 .landing-orb-1 {
   width: 420px; height: 420px;
