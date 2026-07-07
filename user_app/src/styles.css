@@ -53,6 +53,18 @@ body {
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
+/* Soft watercolor backdrop for the whole user app — a fixed layer pinned to the
+   bottom of the viewport, sitting BEHIND all content (transparent page areas let
+   it show through; the topbar and white cards float on top). */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: url("/app-bg.png") no-repeat center bottom;
+  background-size: cover;
+  pointer-events: none;
+}
 a { color: inherit; text-decoration: none; }
 button { cursor: pointer; font-family: var(--font); }
 input, textarea, select { font-family: var(--font); }
