@@ -7156,12 +7156,6 @@ html, body, #root { overflow-x: hidden; }
 .rm-mini-open { font-size: 12.5px; font-weight: 700; color: #2f8f6b; background: none; border: none; cursor: pointer; padding: 0; }
 @media (prefers-color-scheme: dark) {
   .rm-mini { background: rgba(47,143,107,.10); border-color: rgba(255,255,255,.10); }
-  .rm-card { background: rgba(255,255,255,.02); }
-  .rm-card.rm-locked { background: rgba(255,255,255,.015); }
-  .rm-draft { background: linear-gradient(180deg, rgba(47,143,107,.12), rgba(255,255,255,.02) 60%); }
-  .rm-edit-fields { background: rgba(255,255,255,.03); }
-  .rm-modal { background: #1b232c; }
-  .rm-grid { stroke: rgba(255,255,255,.08); }
 }
 .ai-rec-chip {
   display: flex; align-items: center; gap: 9px; width: 100%;
