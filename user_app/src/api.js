@@ -168,12 +168,18 @@ export const api = {
 
   // ---- wellness roadmaps (time-bound improvement journeys) ----
   listRoadmaps: () => req("/me/roadmaps"),
-  createRoadmap: (goal, timeframe) =>
-    req("/me/roadmaps", { method: "POST", body: { goal, timeframe }, timeoutMs: 60000 }),
+  // Draft a roadmap for review (not saved). `opts` = {timeframe, days, feedback}.
+  draftRoadmap: (goal, opts = {}) =>
+    req("/me/roadmaps/draft", { method: "POST", body: { goal, ...opts }, timeoutMs: 60000 }),
+  // Confirm a (possibly edited) draft → saves it. `payload` = {title, goal, timeframe, days, steps}.
+  createRoadmap: (payload) =>
+    req("/me/roadmaps", { method: "POST", body: payload, timeoutMs: 60000 }),
   getRoadmap: (rid) => req(`/me/roadmaps/${rid}`),
   toggleRoadmapStep: (rid, idx) =>
     req(`/me/roadmaps/${rid}/step/${idx}`, { method: "PATCH" }),
   setRoadmapStatus: (rid, status) =>
     req(`/me/roadmaps/${rid}`, { method: "PATCH", body: { status } }),
+  editRoadmap: (rid, patch) =>
+    req(`/me/roadmaps/${rid}`, { method: "PATCH", body: patch }),
   deleteRoadmap: (rid) => req(`/me/roadmaps/${rid}`, { method: "DELETE" }),
 };
