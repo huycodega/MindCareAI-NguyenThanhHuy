@@ -1843,7 +1843,7 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
   display: grid;
   grid-template-columns: 1.05fr 1fr;
   font-family: var(--font);
-  background: var(--bg);
+  background: transparent;      /* reveal the watercolor backdrop on the form side */
 }
 .auth2-brand {
   position: relative;
@@ -2094,6 +2094,7 @@ select.input { appearance: none; background-image: url("data:image/svg+xml,%3Csv
   max-width: 416px;
   padding: 30px 34px 28px;
   border-radius: 22px;
+  background: var(--surface);   /* clean white card floating on the backdrop */
   box-shadow: 0 24px 60px rgba(30,42,56,0.12);
   animation: hero-rise-right 0.7s cubic-bezier(0.16, 0.84, 0.44, 1) both;
 }
