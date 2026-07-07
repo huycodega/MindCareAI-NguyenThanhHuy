@@ -4333,9 +4333,11 @@ h1.title { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin-bo
 }
 /* The message thread is a clean reading surface — without its own background
    the fixed watercolor backdrop bled through behind the bubbles. Keep it solid
-   so the backdrop only shows on other pages / the chat margins, not the thread. */
+   so the backdrop only shows on other pages / the chat margins, not the thread.
+   (No radius here — .chat-shell already clips the rounded frame; rounding
+   .ai-main too left a small gap at the corners next to the rail.) */
 .ai-main { display: flex; flex-direction: column; min-width: 0; min-height: 0;
-  background: var(--bg); border-radius: 18px; }
+  background: var(--bg); }
 
 /* Left conversation rail (ChatGPT-style) */
 .ai-conv {
