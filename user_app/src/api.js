@@ -168,6 +168,8 @@ export const api = {
 
   // ---- wellness roadmaps (time-bound improvement journeys) ----
   listRoadmaps: () => req("/me/roadmaps"),
+  // Propose a roadmap from the user's own chat history + memory (not saved).
+  suggestRoadmap: () => req("/me/roadmaps/suggest", { timeoutMs: 60000 }),
   // Draft a roadmap for review (not saved). `opts` = {timeframe, days, feedback}.
   draftRoadmap: (goal, opts = {}) =>
     req("/me/roadmaps/draft", { method: "POST", body: { goal, ...opts }, timeoutMs: 60000 }),

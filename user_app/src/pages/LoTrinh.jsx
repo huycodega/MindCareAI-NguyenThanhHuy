@@ -131,12 +131,15 @@ function StepEditor({ steps, onText, onWhen, onDel, onAdd }) {
 }
 
 /* ── Draft review panel — the user sees this BEFORE the journey is saved ───── */
-function DraftPanel({ draft, busy, onTitle, onGoal, onStep, onWhen, onDel, onAdd,
-                      onRegenerate, onConfirm, onCancel }) {
+function DraftPanel({ draft, busy, suggested, rationale, onTitle, onGoal, onStep,
+                      onWhen, onDel, onAdd, onRegenerate, onConfirm, onCancel }) {
   const [note, setNote] = useState("");
   return (
-    <div className="rm-draft">
-      <div className="rm-draft-badge">Draft · review before you start</div>
+    <div className={`rm-draft ${suggested ? "rm-suggested" : ""}`}>
+      <div className="rm-draft-badge">
+        {suggested ? "✨ Suggested for you" : "Draft · review before you start"}
+      </div>
+      {suggested && rationale && <div className="rm-rationale">{rationale}</div>}
       <input className="rm-draft-title" value={draft.title}
         onChange={(e) => onTitle(e.target.value)} placeholder="Journey title" />
       <div className="rm-draft-meta">
@@ -160,8 +163,12 @@ function DraftPanel({ draft, busy, onTitle, onGoal, onStep, onWhen, onDel, onAdd
 
       <div className="rm-draft-actions">
         <button className="rm-start" disabled={busy || !draft.steps.some((s) => s.text.trim())}
-          onClick={onConfirm}>{busy ? "Starting…" : "Start this journey →"}</button>
-        <button className="rm-cancel" disabled={busy} onClick={onCancel}>Cancel</button>
+          onClick={onConfirm}>
+          {busy ? "Starting…" : suggested ? "Accept & start →" : "Start this journey →"}
+        </button>
+        <button className="rm-cancel" disabled={busy} onClick={onCancel}>
+          {suggested ? "Create my own instead" : "Cancel"}
+        </button>
       </div>
     </div>
   );
@@ -324,6 +331,9 @@ export default function LoTrinh() {
   const [draft, setDraft] = useState(null);        // pending review
   const [draftReq, setDraftReq] = useState(null);  // {goal, timeframe} for redo
   const [daysFor, setDaysFor] = useState(null);    // goal awaiting a duration
+  const [suggested, setSuggested] = useState(false); // draft came from AI suggest
+  const [rationale, setRationale] = useState("");  // why this was suggested
+  const [suggestMsg, setSuggestMsg] = useState(null); // "not enough yet" note
 
   const load = () =>
     api.listRoadmaps().then((r) => setRoadmaps(r.roadmaps || [])).catch(() => setRoadmaps([]));
@@ -335,12 +345,31 @@ export default function LoTrinh() {
   }
 
   async function runDraft(g, opts) {
-    setBusy(true); setCrisis(null);
+    setBusy(true); setCrisis(null); setSuggestMsg(null);
     try {
       const r = await api.draftRoadmap(g, opts);
       if (r && r.crisis) { setCrisis(r); setDraft(null); }
-      else if (r && r.draft) { setDraft(mkDraft(r.draft)); setDraftReq({ goal: g, timeframe: r.draft.timeframe }); }
+      else if (r && r.draft) {
+        setDraft(mkDraft(r.draft)); setDraftReq({ goal: g, timeframe: r.draft.timeframe });
+        setSuggested(false); setRationale("");
+      }
     } catch { /* keep the input */ }
+    setBusy(false);
+  }
+
+  async function askSuggest() {
+    if (busy) return;
+    setBusy(true); setCrisis(null); setSuggestMsg(null);
+    try {
+      const r = await api.suggestRoadmap();
+      if (r && r.available && r.draft) {
+        setDraft(mkDraft(r.draft));
+        setDraftReq({ goal: r.draft.goal, timeframe: r.draft.timeframe });
+        setSuggested(true); setRationale(r.rationale || "");
+      } else {
+        setSuggestMsg("Chat with me a little more and I'll be able to suggest a journey that fits you.");
+      }
+    } catch { setSuggestMsg("Couldn't build a suggestion just now — try again in a moment."); }
     setBusy(false);
   }
 
@@ -377,12 +406,12 @@ export default function LoTrinh() {
         steps: draft.steps.filter((s) => (s.text || "").trim()).map((s) => ({ text: s.text, when: s.when })),
       });
       if (r && r.crisis) setCrisis(r);
-      else { setDraft(null); setDraftReq(null); setGoal(""); await load(); }
+      else { setDraft(null); setDraftReq(null); setSuggested(false); setRationale(""); setGoal(""); await load(); }
     } catch { /* keep draft for retry */ }
     setBusy(false);
   }
 
-  function cancelDraft() { setDraft(null); setDraftReq(null); }
+  function cancelDraft() { setDraft(null); setDraftReq(null); setSuggested(false); setRationale(""); }
 
   // draft field setters
   const dTitle = (v) => setDraft((d) => ({ ...d, title: v }));
@@ -439,6 +468,15 @@ export default function LoTrinh() {
             Add a duration (“in 3 weeks”) and it drafts straight away — otherwise
             we’ll ask how long you want.
           </div>
+          <button className="rm-suggest-btn" onClick={askSuggest} disabled={busy}>
+            <span className="rm-suggest-spark">✨</span>
+            <span>
+              <span className="rm-suggest-t">Suggest a journey for me</span>
+              <span className="rm-suggest-s">Built from our chats, your themes &amp; what you’ve shared</span>
+            </span>
+            <span className="rm-suggest-arr">→</span>
+          </button>
+          {suggestMsg && <div className="rm-suggest-note">{suggestMsg}</div>}
         </>
       )}
 
@@ -454,7 +492,7 @@ export default function LoTrinh() {
       )}
 
       {draft && (
-        <DraftPanel draft={draft} busy={busy}
+        <DraftPanel draft={draft} busy={busy} suggested={suggested} rationale={rationale}
           onTitle={dTitle} onGoal={dGoal} onStep={dStep} onWhen={dWhen} onDel={dDel} onAdd={dAdd}
           onRegenerate={regenerate} onConfirm={confirmDraft} onCancel={cancelDraft} />
       )}
