@@ -94,7 +94,8 @@ function mapServerMessages(messages) {
     if (m.role === "assistant")
       return { role: "ai", time: fmtTime(m.created_at), text: m.content,
                cards: m.cards || null,
-               safetyPlan: m.safety_plan || null, roadmap: m.roadmap || null };
+               safetyPlan: m.safety_plan || null, roadmap: m.roadmap || null,
+               copingPlan: m.coping_plan || null };
     // system notice (crisis / pending_review / rejected)
     return { role: "ai", time: fmtTime(m.created_at), text: m.content,
              crisis: m.status === "crisis",
@@ -185,6 +186,37 @@ function SafetyPlanCard({ plan }) {
       <div className="safety-plan-foot">
         You can edit this anytime from your profile. If you're in immediate
         danger, contact 988 or your local emergency number now.
+      </div>
+    </div>
+  );
+}
+
+/* ── 24-hour coping plan card ── */
+const CP_FIELDS = [
+  ["action_10min", "⏱️", "Start in 10 minutes"],
+  ["person", "💬", "Reach out to"],
+  ["reminder", "💚", "Remind yourself"],
+  ["avoid", "🚧", "Try to avoid"],
+  ["reach_out_when", "🆘", "Reach a real person when"],
+];
+function CopingPlanCard({ plan }) {
+  if (!plan) return null;
+  return (
+    <div className="coping-card">
+      <div className="coping-head">🌱 Your next 24 hours</div>
+      {CP_FIELDS.map(([key, emoji, label]) => {
+        const v = (plan[key] || "").trim();
+        if (!v) return null;
+        return (
+          <div className="coping-row" key={key}>
+            <span className="coping-emoji">{emoji}</span>
+            <div><div className="coping-label">{label}</div><div className="coping-val">{v}</div></div>
+          </div>
+        );
+      })}
+      <div className="coping-foot">
+        Saved to your profile. If things feel urgent, contact 988 or your local
+        emergency number now.
       </div>
     </div>
   );
@@ -353,6 +385,9 @@ function ChatBubble({ msg, library, onOpenRec, onTalkExpert, onManageAppt,
           )}
           {isAI && msg.roadmap && (
             <RoadmapMini rm={msg.roadmap} onOpen={() => onNav && onNav("lotrinh")} />
+          )}
+          {isAI && msg.copingPlan && (
+            <CopingPlanCard plan={msg.copingPlan} />
           )}
           {recs.length > 0 && (
             <div className="ai-recs">
@@ -1157,7 +1192,7 @@ export default function Chat({ onNav }) {
       // so the user always has a real-person lifeline to reach for.
       const resources = r.crisis_resources || null;
       if (r.outcome === "answered") {
-        show({ role: "ai", time: nowTime(), text: r.final?.response || "I'm here with you.", cards: r.cards, actions: r.actions, safetyPlan: r.safety_plan || null, roadmap: r.roadmap || null });
+        show({ role: "ai", time: nowTime(), text: r.final?.response || "I'm here with you.", cards: r.cards, actions: r.actions, safetyPlan: r.safety_plan || null, roadmap: r.roadmap || null, copingPlan: r.coping_plan || null });
       } else if (r.outcome === "crisis") {
         show({ role: "ai", time: nowTime(), text: r.message || "I'm really glad you reached out. Your safety matters most right now.", crisis: true, resources });
       } else if (r.outcome === "pending_review") {

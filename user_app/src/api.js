@@ -166,6 +166,9 @@ export const api = {
   saveResource: (rid) => req(`/me/saved-resources/${rid}`, { method: "POST" }),
   unsaveResource: (rid) => req(`/me/saved-resources/${rid}`, { method: "DELETE" }),
 
+  // ---- 24-hour coping plan ----
+  getCopingPlan: () => req("/me/coping-plan"),
+
   // ---- wellness roadmaps (time-bound improvement journeys) ----
   listRoadmaps: () => req("/me/roadmaps"),
   // Propose a roadmap from the user's own chat history + memory (not saved).
