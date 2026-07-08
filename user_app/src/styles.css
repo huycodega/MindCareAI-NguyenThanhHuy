@@ -7188,6 +7188,13 @@ html, body, #root { overflow-x: hidden; }
 @keyframes rm-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes rm-spin { to { transform: rotate(360deg); } }
 
+/* ── Data transparency card (Settings) ── */
+.dt-list { display: flex; flex-direction: column; gap: 14px; }
+.dt-row { padding-left: 2px; }
+.dt-q { font-size: 13.5px; font-weight: 700; color: var(--ink, #1c2430); margin-bottom: 4px; }
+.dt-a { font-size: 13px; color: var(--ink-soft, #56606e); line-height: 1.55; margin: 0; }
+.dt-a strong { color: #2f8f6b; font-weight: 700; }
+
 /* ── Smooth handoff card (in chat) ── */
 .handoff-card { margin-top: 12px; }
 .handoff-actions { display: flex; flex-direction: column; gap: 8px; }

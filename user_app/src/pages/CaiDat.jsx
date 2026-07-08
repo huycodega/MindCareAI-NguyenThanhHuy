@@ -287,6 +287,35 @@ export default function CaiDat({ user, onLogout }) {
 
           {/* Other */}
           <section className="st-card">
+            <CardHead icon="lock" title="Your data, in plain words"
+              sub="Full transparency — no hidden trackers, no surprises." />
+            <div className="dt-list">
+              <div className="dt-row">
+                <div className="dt-q">🔒 Where is my data stored?</div>
+                <p className="dt-a">Encrypted (AES-256-GCM) on our own secure servers.
+                  Your messages, journal and intake are encrypted at rest — not stored in plain text.</p>
+              </div>
+              <div className="dt-row">
+                <div className="dt-q">👁️ Who can read it?</div>
+                <p className="dt-a"><strong>Only you.</strong> A counsellor sees a case <strong>only</strong>
+                  when you choose to share a summary, or when a message is flagged for your safety —
+                  and every access is written to an audit log.</p>
+              </div>
+              <div className="dt-row">
+                <div className="dt-q">🤖 Is it used to train AI?</div>
+                <p className="dt-a"><strong>No.</strong> Your conversations are never used to train any
+                  model. To write a reply, your message is scrubbed of personal identifiers before it
+                  reaches the AI.</p>
+              </div>
+              <div className="dt-row">
+                <div className="dt-q">📤 Can I export or delete everything?</div>
+                <p className="dt-a">Anytime — download all your data as one JSON file, or permanently
+                  delete your account and everything in it. Both are right below.</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="st-card">
             <CardHead icon="grid" title="Other" sub="Account management and data options." />
             <div className="st-other-list">
               <div className="st-other-row st-disabled">
