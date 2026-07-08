@@ -7188,6 +7188,29 @@ html, body, #root { overflow-x: hidden; }
 @keyframes rm-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes rm-spin { to { transform: rotate(360deg); } }
 
+/* ── Student Toolkit page ── */
+.tk-page { max-width: 940px; margin: 0 auto; }
+.tk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px; margin-top: 18px; }
+.tk-card { display: flex; flex-direction: column; padding: 18px 18px 16px; border-radius: 16px;
+  border: 1px solid var(--line, #e3e8ef); background: var(--surface, #fff);
+  box-shadow: var(--shadow-sm, 0 1px 4px rgba(0,0,0,.06)); border-top: 3px solid #56C2A8;
+  animation: rm-rise .35s ease both; }
+.tk-card.tk-blue { border-top-color: #3B82F6; }
+.tk-card.tk-amber { border-top-color: #F59E0B; }
+.tk-card.tk-green { border-top-color: #10B981; }
+.tk-card.tk-purple { border-top-color: #8B5CF6; }
+.tk-card.tk-pink { border-top-color: #EC4899; }
+.tk-card.tk-teal { border-top-color: #56C2A8; }
+.tk-emoji { font-size: 26px; }
+.tk-title { font-size: 16px; font-weight: 800; color: var(--ink, #1c2430); margin: 8px 0 6px; }
+.tk-tip { font-size: 13px; color: var(--ink-soft, #56606e); line-height: 1.55; margin: 0 0 14px; flex: 1; }
+.tk-btn { align-self: flex-start; padding: 9px 15px; border: none; border-radius: 10px;
+  background: var(--primary, #56C2A8); color: #fff; font-weight: 700; font-size: 13px; cursor: pointer;
+  transition: transform .12s, background .12s; }
+.tk-btn:hover { transform: translateY(-1px); background: var(--primary-dark, #45A892); }
+@media (prefers-color-scheme: dark) { .tk-card { background: rgba(255,255,255,.02); } }
+
 /* ── Data transparency card (Settings) ── */
 .dt-list { display: flex; flex-direction: column; gap: 14px; }
 .dt-row { padding-left: 2px; }

@@ -903,6 +903,14 @@ export default function Chat({ onNav }) {
   const [recDetail, setRecDetail] = useState(null);
   const [expertBooking, setExpertBooking] = useState(null); // in-chat booking flow
   const [rescheduleId, setRescheduleId] = useState(null);   // appt being rescheduled
+
+  // A Student Toolkit module can seed the composer with a starter line.
+  useEffect(() => {
+    try {
+      const pre = localStorage.getItem("mc_chat_prefill");
+      if (pre) { setInput(pre); localStorage.removeItem("mc_chat_prefill"); }
+    } catch { /* ignore */ }
+  }, []);
   const [listenOnly, setListenOnly] = useState(false);      // "just listen" toggle
   const bottomRef = useRef(null);
   const inputRef = useRef(null);

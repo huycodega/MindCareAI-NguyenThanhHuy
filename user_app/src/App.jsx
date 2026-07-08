@@ -11,6 +11,7 @@ import SangLoc from "./pages/SangLoc.jsx";
 import HoSo from "./pages/HoSo.jsx";
 import NhatKy from "./pages/NhatKy.jsx";
 import LoTrinh from "./pages/LoTrinh.jsx";
+import Toolkit from "./pages/Toolkit.jsx";
 import BaiHoc from "./pages/BaiHoc.jsx";
 import TaiNguyen from "./pages/TaiNguyen.jsx";
 import TuVan from "./pages/TuVan.jsx";
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { id: "tuvan", icon: "expert", label: "Counselling" },
   { id: "nhatky", icon: "journal", label: "Journal" },
   { id: "lotrinh", icon: "journey", label: "Journey" },
+  { id: "toolkit", icon: "toolkit", label: "Student Toolkit" },
   { id: "hoso", icon: "user", label: "Profile" },
   { id: "caidat", icon: "settings", label: "Settings" },
 ];
@@ -43,7 +45,8 @@ const TOPBAR_TABS = [
 const PAGE_PATHS = {
   dashboard: "/dashboard", sangloc: "/screening", chat: "/chat",
   baihoc: "/lessons", tainguyen: "/resources", tuvan: "/counselling",
-  nhatky: "/journal", lotrinh: "/journey", hoso: "/profile", caidat: "/settings",
+  nhatky: "/journal", lotrinh: "/journey", toolkit: "/toolkit",
+  hoso: "/profile", caidat: "/settings",
 };
 const PATH_PAGES = Object.fromEntries(
   Object.entries(PAGE_PATHS).map(([id, p]) => [p, id]));
@@ -140,6 +143,16 @@ function NavSvgIcon({ name }) {
         <circle cx="6" cy="20" r="1.4" />
         <circle cx="12" cy="12" r="1.4" />
         <circle cx="18" cy="4" r="1.4" />
+      </svg>
+    );
+  }
+  if (name === "toolkit") {
+    return (
+      <svg {...common} className="nav-svg-icon">
+        <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+        <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+        <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+        <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
       </svg>
     );
   }
@@ -409,6 +422,7 @@ export default function App() {
     tuvan:     <TuVan />,
     nhatky:    <NhatKy />,
     lotrinh:   <LoTrinh />,
+    toolkit:   <Toolkit onNav={navTo} />,
     caidat:    <CaiDat user={user} onLogout={logout} />,
   };
 
