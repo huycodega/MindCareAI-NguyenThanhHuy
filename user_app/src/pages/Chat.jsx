@@ -95,7 +95,7 @@ function mapServerMessages(messages) {
       return { role: "ai", time: fmtTime(m.created_at), text: m.content,
                cards: m.cards || null,
                safetyPlan: m.safety_plan || null, roadmap: m.roadmap || null,
-               copingPlan: m.coping_plan || null };
+               copingPlan: m.coping_plan || null, handoff: m.handoff || null };
     // system notice (crisis / pending_review / rejected)
     return { role: "ai", time: fmtTime(m.created_at), text: m.content,
              crisis: m.status === "crisis",
@@ -218,6 +218,94 @@ function CopingPlanCard({ plan }) {
         Saved to your profile. If things feel urgent, contact 988 or your local
         emergency number now.
       </div>
+    </div>
+  );
+}
+
+/* ── Smooth handoff to a human — share summary / book / draft a message ── */
+function BriefingPreview({ b }) {
+  const rows = [
+    ["Main concern", b.main_concern], ["Risk", b.risk],
+    ["Techniques tried", b.techniques_tried], ["Suggested next step", b.suggested_next_step],
+  ].filter(([, v]) => v);
+  const quotes = Array.isArray(b.notable_quotes) ? b.notable_quotes : [];
+  return (
+    <div className="handoff-brief">
+      {rows.map(([l, v]) => (
+        <div className="handoff-brief-row" key={l}><span>{l}</span><p>{v}</p></div>
+      ))}
+      {quotes.length > 0 && (
+        <div className="handoff-brief-row"><span>Your words</span>
+          <p>{quotes.map((q, i) => <em key={i}>“{q}” </em>)}</p></div>
+      )}
+    </div>
+  );
+}
+
+function HandoffCard({ onNav }) {
+  const [busy, setBusy] = useState("");
+  const [shared, setShared] = useState(null);
+  const [showMsg, setShowMsg] = useState(false);
+  const [recipient, setRecipient] = useState("");
+  const [draft, setDraft] = useState(null);
+
+  async function share() {
+    setBusy("share");
+    try { const r = await api.handoffSummary(); setShared(r); } catch {}
+    setBusy("");
+  }
+  async function makeMsg() {
+    setBusy("msg");
+    try { const r = await api.handoffMessage(recipient.trim()); setDraft(r.draft); } catch {}
+    setBusy("");
+  }
+
+  return (
+    <div className="handoff-card">
+      <div className="handoff-actions">
+        <button className="handoff-btn" onClick={share} disabled={!!busy || !!shared}>
+          <span className="handoff-ico">📋</span>
+          <span className="handoff-txt"><b>Share a summary with the counselling team</b>
+            <small>They can follow up with you</small></span>
+        </button>
+        <button className="handoff-btn" onClick={() => onNav && onNav("tuvan")}>
+          <span className="handoff-ico">📅</span>
+          <span className="handoff-txt"><b>Book 15 min with a counsellor</b>
+            <small>Pick a time that works</small></span>
+        </button>
+        <button className="handoff-btn" onClick={() => setShowMsg((v) => !v)}>
+          <span className="handoff-ico">💬</span>
+          <span className="handoff-txt"><b>Help me write a message to someone</b>
+            <small>A friend, sibling, or a parent</small></span>
+        </button>
+      </div>
+
+      {busy === "share" && <div className="handoff-note">Preparing your summary…</div>}
+      {shared && (
+        <div className="handoff-result">
+          <div className="handoff-result-msg">{shared.message}</div>
+          {shared.briefing && <BriefingPreview b={shared.briefing} />}
+        </div>
+      )}
+
+      {showMsg && !draft && (
+        <div className="handoff-msg-form">
+          <input className="handoff-input" value={recipient}
+            placeholder="Who's it for? (e.g. a close friend, my sister, mum)"
+            onChange={(e) => setRecipient(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && !busy && makeMsg()} />
+          <button className="handoff-draft-btn" disabled={!!busy} onClick={makeMsg}>
+            {busy === "msg" ? "Writing…" : "Draft it"}</button>
+        </div>
+      )}
+      {draft && (
+        <div className="handoff-draft">
+          <div className="handoff-draft-label">Here's a message you could send — edit as you like:</div>
+          <div className="handoff-draft-text">{draft}</div>
+          <button className="handoff-copy" onClick={() => { try { navigator.clipboard.writeText(draft); } catch {} }}>
+            Copy</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -388,6 +476,9 @@ function ChatBubble({ msg, library, onOpenRec, onTalkExpert, onManageAppt,
           )}
           {isAI && msg.copingPlan && (
             <CopingPlanCard plan={msg.copingPlan} />
+          )}
+          {isAI && msg.handoff && (
+            <HandoffCard onNav={onNav} />
           )}
           {recs.length > 0 && (
             <div className="ai-recs">
@@ -1192,7 +1283,7 @@ export default function Chat({ onNav }) {
       // so the user always has a real-person lifeline to reach for.
       const resources = r.crisis_resources || null;
       if (r.outcome === "answered") {
-        show({ role: "ai", time: nowTime(), text: r.final?.response || "I'm here with you.", cards: r.cards, actions: r.actions, safetyPlan: r.safety_plan || null, roadmap: r.roadmap || null, copingPlan: r.coping_plan || null });
+        show({ role: "ai", time: nowTime(), text: r.final?.response || "I'm here with you.", cards: r.cards, actions: r.actions, safetyPlan: r.safety_plan || null, roadmap: r.roadmap || null, copingPlan: r.coping_plan || null, handoff: r.handoff || null });
       } else if (r.outcome === "crisis") {
         show({ role: "ai", time: nowTime(), text: r.message || "I'm really glad you reached out. Your safety matters most right now.", crisis: true, resources });
       } else if (r.outcome === "pending_review") {

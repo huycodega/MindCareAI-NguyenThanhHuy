@@ -166,6 +166,11 @@ export const api = {
   saveResource: (rid) => req(`/me/saved-resources/${rid}`, { method: "POST" }),
   unsaveResource: (rid) => req(`/me/saved-resources/${rid}`, { method: "DELETE" }),
 
+  // ---- smooth handoff to a human ----
+  handoffSummary: () => req("/me/handoff/summary", { method: "POST", timeoutMs: 60000 }),
+  handoffMessage: (recipient) =>
+    req("/me/handoff/message", { method: "POST", body: { recipient }, timeoutMs: 60000 }),
+
   // ---- 24-hour coping plan ----
   getCopingPlan: () => req("/me/coping-plan"),
 
